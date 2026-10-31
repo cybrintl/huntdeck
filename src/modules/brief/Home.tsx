@@ -1,11 +1,48 @@
-import kevData from '../../../public/data/kev.json'
-import epssData from '../../../public/data/epss.json'
 import hypothesesData from '../../../public/data/hunt-hypotheses.json'
+import { useQuery } from '@tanstack/react-query'
 import type { HuntHypothesis } from '../../types'
 
 const hypotheses: HuntHypothesis[] = hypothesesData
 
+interface DataManifest {
+  counts?: {
+    kev: number
+    epss: number
+  }
+}
+
+async function fetchManifest(): Promise<DataManifest> {
+  const url = new URL('data/manifest.json', document.baseURI).toString()
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`Failed to load data manifest: ${response.status} ${response.statusText}`)
+  }
+  const data: unknown = await response.json()
+  if (typeof data !== 'object' || data === null) {
+    throw new Error('Data manifest has an invalid format')
+  }
+  if (!('counts' in data)) {
+    return {}
+  }
+  const { counts } = data
+  if (
+    typeof counts !== 'object' ||
+    counts === null ||
+    !('kev' in counts) ||
+    !('epss' in counts) ||
+    typeof counts.kev !== 'number' ||
+    typeof counts.epss !== 'number'
+  ) {
+    throw new Error('Data manifest has invalid feed counts')
+  }
+  return { counts: { kev: counts.kev, epss: counts.epss } }
+}
+
 export default function Home() {
+  const manifest = useQuery({ queryKey: ['data-manifest'], queryFn: fetchManifest })
+  const counts = manifest.data?.counts
+  const feedsEmpty = manifest.isSuccess && (!counts || counts.kev === 0 || counts.epss === 0)
+
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <section>
@@ -17,8 +54,8 @@ export default function Home() {
       </section>
 
       <section aria-label="Threat data summary" className="grid gap-4 sm:grid-cols-3">
-        <SummaryCard label="Known exploited vulnerabilities" value={kevData.length} />
-        <SummaryCard label="EPSS-scored CVEs" value={epssData.length} />
+        <SummaryCard label="Known exploited vulnerabilities" value={counts?.kev} loading={manifest.isLoading} />
+        <SummaryCard label="EPSS-scored CVEs" value={counts?.epss} loading={manifest.isLoading} />
         <SummaryCard label="Hunt playbooks" value={hypotheses.length} />
       </section>
 
@@ -57,12 +94,20 @@ export default function Home() {
         )}
       </section>
 
-      {(kevData.length === 0 || epssData.length === 0) && (
+      {manifest.isError && (
+        <section aria-label="Feed loading error" className="rounded-xl border border-red-200 bg-red-50 p-5">
+          <h2 className="font-semibold text-red-950">Unable to load vulnerability feeds</h2>
+          <p className="mt-1 text-sm text-red-900">{manifest.error.message}</p>
+        </section>
+      )}
+
+      {feedsEmpty && (
         <section aria-label="Feed status" className="rounded-xl border border-amber-200 bg-amber-50 p-5">
-          <h2 className="font-semibold text-amber-950">Vulnerability feeds have no data yet</h2>
+          <h2 className="font-semibold text-amber-950">
+            {counts ? 'Vulnerability feeds have no data yet' : 'Vulnerability data has not been built yet'}
+          </h2>
           <p className="mt-1 text-sm text-amber-900">
-            The currently published KEV and EPSS files are empty. Run the Build Data workflow and publish its
-            generated files to include vulnerability intelligence here.
+            Run the Build Data workflow to fetch current vulnerability feeds and publish them to the site.
           </p>
         </section>
       )}
@@ -70,11 +115,13 @@ export default function Home() {
   )
 }
 
-function SummaryCard({ label, value }: { label: string; value: number }) {
+function SummaryCard({ label, value, loading = false }: { label: string; value?: number; loading?: boolean }) {
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <p className="text-sm text-slate-600">{label}</p>
-      <p className="mt-2 text-3xl font-bold text-slate-950">{value.toLocaleString()}</p>
+      <p className="mt-2 text-3xl font-bold text-slate-950">
+        {loading ? 'Loading…' : value?.toLocaleString() ?? 'Unavailable'}
+      </p>
     </article>
   )
 }
