@@ -5,36 +5,40 @@
       "id": "openphish",
       "url": "https://openphish.com/feed.txt",
       "source": "OpenPhish Community Feed",
-      "fetched_at": "2026-10-31T22:28:13.012Z",
+      "fetched_at": "2026-10-31T23:03:07.136Z",
       "status": "ok",
-      "count": 300
+      "count": 300,
+      "published_count": 100
     },
     "dshield": {
       "kind": "ioc",
       "id": "dshield",
       "url": "https://feeds.dshield.org/block.txt",
       "source": "DShield Recommended Block List",
-      "fetched_at": "2026-10-31T22:28:13.072Z",
+      "fetched_at": "2026-10-31T23:03:07.198Z",
       "status": "ok",
-      "count": 20
+      "count": 20,
+      "published_count": 20
     },
     "cins": {
       "kind": "ioc",
       "id": "cins",
       "url": "https://cinsscore.com/list/ci-badguys.txt",
       "source": "CINS Army",
-      "fetched_at": "2026-10-31T22:28:14.936Z",
+      "fetched_at": "2026-10-31T23:03:08.902Z",
       "status": "ok",
-      "count": 15000
+      "count": 15000,
+      "published_count": 100
     },
     "blocklist-de": {
       "kind": "ioc",
       "id": "blocklist-de",
       "url": "https://lists.blocklist.de/lists/all.txt",
       "source": "blocklist.de",
-      "fetched_at": "2026-10-31T22:28:15.101Z",
+      "fetched_at": "2026-10-31T23:03:09.010Z",
       "status": "ok",
-      "count": 25289
+      "count": 25258,
+      "published_count": 100
     },
     "sigma": {
       "kind": "detection",
@@ -59,6 +63,30 @@
       "fetched_at": "2026-10-31T22:28:31.212Z",
       "status": "ok",
       "count": 500
+    },
+    "kev": {
+      "kind": "vulnerability",
+      "source": "CISA Known Exploited Vulnerabilities",
+      "url": "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
+      "fetched_at": "2026-10-31T23:03:17.870Z",
+      "status": "ok",
+      "count": 1766
+    },
+    "epss": {
+      "kind": "vulnerability",
+      "source": "FIRST EPSS",
+      "url": "https://epss.cyentia.com/epss_scores-current.csv.gz",
+      "fetched_at": "2026-10-31T23:03:21.327Z",
+      "status": "ok",
+      "count": 5819
+    },
+    "attack": {
+      "kind": "attack",
+      "source": "MITRE ATT&CK Enterprise",
+      "url": "https://github.com/mitre/cti/tree/master/enterprise-attack",
+      "fetched_at": "2026-10-31T23:03:23.292Z",
+      "status": "ok",
+      "count": 706
     }
   },
   "warnings": []

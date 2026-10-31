@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { buildAttackTechniques } from './attack'
+import { recordSourceStatus } from './source-status'
 
 const url = 'https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json'
 const response = await fetch(url)
@@ -25,4 +26,12 @@ if (techniques.length < 500) {
 
 await mkdir('public/data', { recursive: true })
 await writeFile('public/data/techniques.json', JSON.stringify(techniques))
+await recordSourceStatus('attack', {
+  kind: 'attack',
+  source: 'MITRE ATT&CK Enterprise',
+  url: 'https://github.com/mitre/cti/tree/master/enterprise-attack',
+  fetched_at: new Date().toISOString(),
+  status: 'ok',
+  count: techniques.length,
+})
 console.log(`ATT&CK saved (${techniques.length} techniques)`)

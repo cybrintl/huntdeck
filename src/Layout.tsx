@@ -17,9 +17,11 @@ function isTheme(value: string | null): value is Theme {
 const navigation = [
   { to: '/', label: 'Daily brief', end: true },
   { to: '/hypotheses', label: 'Hypotheses', end: false },
+  { to: '/ideas', label: 'Hunt ideas', end: false },
   { to: '/coverage', label: 'Coverage', end: false },
   { to: '/rules', label: 'Rules', end: false },
   { to: '/triage', label: 'IOC triage', end: false },
+  { to: '/health', label: 'Data health', end: false },
   { to: '/intelligence', label: 'Intel leads', end: false },
 ]
 

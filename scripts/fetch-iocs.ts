@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { selectIocSample } from './ioc-snapshot'
 
 interface Source {
   id: string
@@ -27,6 +28,7 @@ interface SourceResult {
   fetched_at: string
   status: 'ok' | 'stale'
   count: number
+  published_count?: number
 }
 
 interface SourceStatusDocument {
@@ -184,9 +186,11 @@ async function readSourceStatus(): Promise<SourceStatusDocument> {
 }
 
 const previous = await readPrevious()
+const sourceStatus = await readSourceStatus()
 const records = new Map<string, IOCRecord>()
 const statuses: SourceResult[] = []
 const warnings: string[] = []
+const maximumIndicatorsPerSource = 100
 
 for (const source of sources) {
   try {
@@ -194,8 +198,11 @@ for (const source of sources) {
     const values = source.parse(text)
     const accepted = values.filter(value => source.type !== 'ip' || isPublicIpv4(value))
     if (accepted.length === 0) throw new Error(`${source.name} contained no valid indicators`)
-    for (const rawValue of accepted) {
-      const value = source.type === 'url' ? rawValue.replace(/[.,;:!?]+$/, '') : rawValue
+    const normalizedValues = accepted.map(value =>
+      source.type === 'url' ? value.replace(/[.,;:!?]+$/, '') : value
+    )
+    const sampledValues = selectIocSample(normalizedValues, maximumIndicatorsPerSource)
+    for (const value of sampledValues) {
       const key = `${source.type}:${value.toLowerCase()}`
       const record = records.get(key) ?? {
         value,
@@ -216,12 +223,15 @@ for (const source of sources) {
       fetched_at: new Date().toISOString(),
       status: 'ok',
       count: accepted.length,
+      published_count: sampledValues.length,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.warn(`Optional IOC source unavailable; retaining last-good records: ${message}`)
     warnings.push(message)
-    const priorRecords = previous.filter(record => record.sources.includes(source.name))
+    const priorRecords = previous
+      .filter(record => record.sources.includes(source.name))
+      .slice(0, maximumIndicatorsPerSource)
     for (const record of priorRecords) {
       const key = `${record.type}:${record.value.toLowerCase()}`
       const { last_seen: _lastSeen, ...retained } = record
@@ -236,7 +246,14 @@ for (const source of sources) {
       source: source.name,
       fetched_at: new Date().toISOString(),
       status: 'stale',
-      count: priorRecords.length,
+      count: (() => {
+        const priorStatus = sourceStatus.sources[source.id]
+        return typeof priorStatus === 'object' && priorStatus !== null &&
+          'count' in priorStatus && typeof priorStatus.count === 'number'
+          ? priorStatus.count
+          : priorRecords.length
+      })(),
+      published_count: priorRecords.length,
     })
   }
 }
@@ -249,14 +266,13 @@ const snapshot = [...records.values()]
     (b.source_weight ?? 0) - (a.source_weight ?? 0) ||
     a.value.localeCompare(b.value)
   )
-  .slice(0, 30_000)
+  .slice(0, sources.length * maximumIndicatorsPerSource)
 await mkdir('public/data', { recursive: true })
 await writeFile('public/data/iocs.json', JSON.stringify(snapshot))
-const sourceStatus = await readSourceStatus()
 for (const status of statuses) sourceStatus.sources[status.id] = status
 sourceStatus.warnings = [
   ...sourceStatus.warnings.filter(warning => !warning.startsWith('ioc:')),
   ...warnings.map(warning => `ioc: ${warning}`),
 ]
 await writeFile('public/data/source-status.json', JSON.stringify(sourceStatus, null, 2))
-console.log(`IOC snapshot saved (${snapshot.length} unique indicators)`)
+console.log(`IOC snapshot saved (${snapshot.length} unique indicators; up to ${maximumIndicatorsPerSource} per feed)`)

@@ -71,12 +71,13 @@ export interface DataManifest {
 }
 
 export interface DataSourceStatus {
-  kind?: 'ioc' | 'detection'
+  kind?: 'ioc' | 'detection' | 'news' | 'vulnerability' | 'attack'
   source?: string
   url?: string
   fetched_at: string
-  status: string
+  status: 'ok' | 'stale' | 'unknown'
   count: number
+  published_count?: number
 }
 
 export type IOCType = 'ip' | 'domain' | 'url' | 'md5' | 'sha1' | 'sha256' | 'cve' | 'attack'
@@ -132,7 +133,7 @@ export interface NewsSourceStatus {
   name: string
   url: string
   fetched_at: string
-  status: 'ok' | 'stale'
+  status: 'ok' | 'stale' | 'unknown'
   count: number
 }
 

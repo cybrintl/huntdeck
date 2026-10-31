@@ -3,10 +3,12 @@ import { Route, Routes } from 'react-router-dom'
 import Layout from './Layout'
 import Home from './modules/brief/Home'
 import Library from './modules/hypotheses/Library'
+import Ideas from './modules/hypotheses/Ideas'
 import Coverage from './modules/coverage/Coverage'
 import Triage from './modules/triage/Triage'
 import Rules from './modules/rules/Rules'
 import Intelligence from './modules/intelligence/Intelligence'
+import Health from './modules/health/Health'
 const qc = new QueryClient()
 export default function App() {
   return <QueryClientProvider client={qc}>
@@ -15,8 +17,10 @@ export default function App() {
         <Route index element={<Home />} />
         <Route path="intelligence" element={<Intelligence />} />
         <Route path="hypotheses" element={<Library />} />
+        <Route path="ideas" element={<Ideas />} />
         <Route path="coverage" element={<Coverage />} />
         <Route path="triage" element={<Triage />} />
+        <Route path="health" element={<Health />} />
         <Route path="rules" element={<Rules />} />
         <Route path="*" element={<NotFound />} />
       </Route>

@@ -54,12 +54,10 @@ const manifest = {
     news: news.items.length,
   },
   sources: {
-    kev: builtAt,
-    epss: builtAt,
-    attack: builtAt,
     ...sourceStatus.sources,
     news: {
-      source: 'OffSec Radar RSS',
+      kind: 'news',
+      source: 'Threat intelligence and security news RSS feeds',
       fetched_at: news.built_at,
       status: news.sources.length > 0 && news.sources.every(source =>
         typeof source === 'object' &&

@@ -1,7 +1,9 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { gunzipSync } from 'node:zlib'
+import { recordSourceStatus } from './source-status'
 
-const res = await fetch('https://epss.cyentia.com/epss_scores-current.csv.gz')
+const url = 'https://epss.cyentia.com/epss_scores-current.csv.gz'
+const res = await fetch(url)
 if (!res.ok) {
   throw new Error(`Failed to fetch EPSS data: ${res.status} ${res.statusText}`)
 }
@@ -66,4 +68,12 @@ const data = allScores.filter(score => selectedCves.has(score.cve))
 
 await mkdir('public/data', { recursive: true })
 await writeFile('public/data/epss.json', JSON.stringify(data))
+await recordSourceStatus('epss', {
+  kind: 'vulnerability',
+  source: 'FIRST EPSS',
+  url,
+  fetched_at: new Date().toISOString(),
+  status: 'ok',
+  count: data.length,
+})
 console.log(`EPSS saved (${data.length} scores: ${kevCves.size} KEV + top 5,000 EPSS)`)

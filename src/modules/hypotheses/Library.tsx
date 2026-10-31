@@ -281,6 +281,7 @@ export default function Library() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Link className="button-secondary" to="/ideas">Explore hunt ideas</Link>
           <button className="button-secondary" disabled={filtered.length === 0} onClick={exportFilteredHunts}>
             Export filtered results
           </button>

@@ -165,6 +165,9 @@ export default function Home() {
           <Link className="text-sm font-semibold text-sky-800 hover:underline print:hidden" to="/hypotheses">
             Browse all hypotheses
           </Link>
+          <Link className="text-sm font-semibold text-sky-800 hover:underline print:hidden" to="/ideas">
+            Get ideas from recent reporting
+          </Link>
         </div>
         {hypotheses.length > 0 ? (
           <div className="grid gap-4 lg:grid-cols-2">

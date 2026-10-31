@@ -12,14 +12,15 @@ function csvEscape(value: string): string {
   return `"${value.replace(/"/g, '""')}"`
 }
 
-function snapshotCsv(records: IOCRecord[]): string {
+function snapshotCsv(records: IOCRecord[], sourceUrls: Map<string, string>): string {
   return [
-    'value,type,category,sources,source_weight,malware_family',
+    'value,type,category,sources,source_urls,source_weight,malware_family',
     ...records.map(record => [
       record.value,
       record.type,
       record.category,
       record.sources.join('; '),
+      record.sources.map(source => sourceUrls.get(source) ?? '').filter(Boolean).join('; '),
       record.source_weight?.toString() ?? '',
       record.malware_family ?? '',
     ].map(csvEscape).join(',')),
@@ -63,6 +64,12 @@ export default function Triage() {
     }
     return statuses.sort((a, b) => (a[1].source ?? '').localeCompare(b[1].source ?? ''))
   }, [manifest.data])
+  const sourceUrls = useMemo(
+    () => new Map(iocSourceStatuses.flatMap(([, status]) =>
+      status.source && status.url ? [[status.source, status.url] as const] : []
+    )),
+    [iocSourceStatuses]
+  )
   const filteredIocs = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase()
     return corpus.filter(record => {
@@ -129,13 +136,13 @@ export default function Triage() {
             <h2 id="ioc-snapshot-heading" className="text-xl font-bold text-slate-950">Published IOC snapshot</h2>
             <p className="mt-1 text-sm text-slate-600">
               {iocs.isLoading ? 'Loading indicator intelligence…' :
-                `${corpus.length.toLocaleString()} indicators from ${sources.length} published feeds`}
+                `${corpus.length.toLocaleString()} indicators from ${iocSourceStatuses.length || sources.length} published feeds`}
             </p>
           </div>
           <button className="button-secondary" disabled={filteredIocs.length === 0}
             onClick={() => download(
               'huntdeck-ioc-snapshot.csv',
-              snapshotCsv(filteredIocs),
+              snapshotCsv(filteredIocs, sourceUrls),
               'text/csv;charset=utf-8',
             )}>
             Export filtered snapshot CSV
@@ -143,30 +150,33 @@ export default function Triage() {
         </div>
 
         <p className="text-xs text-slate-500">
-          Fetch time records when HuntDeck collected a feed, not when each indicator was last observed. The source-weight
-          value is a HuntDeck sorting heuristic, not confidence supplied by the feed.
+          The snapshot includes up to 100 unique indicators per feed, in feed order; a feed may not provide per-indicator
+          timestamps. Fetch time is when HuntDeck collected a feed, not when an indicator was last observed.
+          Source weight is a HuntDeck sorting heuristic, not source-provided confidence.
         </p>
         {iocSourceStatuses.length > 0 && (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <ul aria-label="Published IOC feeds" className="grid gap-x-5 gap-y-2 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:grid-cols-2">
             {iocSourceStatuses.map(([id, status]) => (
-              <article className="rounded-xl border border-slate-200 bg-white p-4" key={id}>
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-semibold text-slate-900">{status.source ?? id}</h3>
-                  <span className={status.status === 'ok' ? 'badge-success' : 'badge-warning'}>
-                    {status.status === 'ok' ? 'Current fetch' : 'Last-good snapshot'}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-slate-600">
-                  {status.count.toLocaleString()} indicators · fetched {new Date(status.fetched_at).toLocaleString()}
-                </p>
-                {status.url && (
-                  <a className="mt-2 inline-block text-xs font-semibold text-sky-800 underline"
-                    href={status.url} target="_blank" rel="noreferrer">Source feed</a>
-                )}
-              </article>
+              <li className="flex min-w-0 items-center gap-2 text-xs" key={id}>
+                <span className={status.status === 'ok' ? 'size-2 shrink-0 rounded-full bg-emerald-500' : 'size-2 shrink-0 rounded-full bg-amber-500'} aria-hidden="true" />
+                {status.url ? (
+                  <a className="truncate font-semibold text-sky-800 underline"
+                    href={status.url} target="_blank" rel="noreferrer">
+                    {status.source ?? id}
+                  </a>
+                ) : <span className="truncate font-semibold text-slate-800">{status.source ?? id}</span>}
+                <span className="shrink-0 text-slate-500">
+                  {status.published_count ?? Math.min(status.count, 100)} indexed
+                  {status.count > (status.published_count ?? 100) &&
+                    ` · ${status.count.toLocaleString()} in feed`}
+                </span>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
+        <p className="text-right text-xs text-slate-500">
+          <Link className="font-semibold text-sky-800 underline" to="/health">View all data source health</Link>
+        </p>
         {manifest.data?.warnings && manifest.data.warnings.length > 0 && (
           <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="status">
             Some data sources reported refresh warnings. Check each source status and verify indicator age before use.
@@ -218,7 +228,7 @@ export default function Triage() {
                 <th className="px-4 py-3">Indicator</th>
                 <th className="px-4 py-3">Type / category</th>
                 <th className="px-4 py-3">Threat context</th>
-                <th className="px-4 py-3">Sources</th>
+                <th className="px-4 py-3">Sources &amp; references</th>
                 <th className="px-4 py-3">Source weight (heuristic)</th>
               </tr>
             </thead>
@@ -234,7 +244,18 @@ export default function Triage() {
                     <span className="ml-1 badge-muted">{record.category}</span>
                   </td>
                   <td className="px-4 py-3 text-slate-700">{record.malware_family ?? 'No family metadata'}</td>
-                  <td className="px-4 py-3 text-xs text-slate-600">{record.sources.join(', ')}</td>
+                  <td className="px-4 py-3 text-xs text-slate-600">
+                    <ul className="space-y-1">
+                      {record.sources.map(source => (
+                        <li key={source}>
+                          {sourceUrls.has(source) ? (
+                            <a className="font-medium text-sky-800 underline" href={sourceUrls.get(source)}
+                              target="_blank" rel="noreferrer">{source}</a>
+                          ) : source}
+                        </li>
+                      ))}
+                    </ul>
+                  </td>
                   <td className="px-4 py-3">
                     {record.source_weight === undefined ? '—' : `${Math.round(record.source_weight * 100)}%`}
                   </td>

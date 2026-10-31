@@ -77,7 +77,10 @@ export default function Intelligence() {
             references linked to indexed hunts. Open the source for full reporting.
           </p>
         </div>
-        <Link className="button-secondary" to="/">Back to daily brief</Link>
+        <div className="flex gap-2">
+          <Link className="button-secondary" to="/ideas">Generate hunt ideas</Link>
+          <Link className="button-secondary" to="/">Back to daily brief</Link>
+        </div>
       </header>
 
       <section aria-label="Feed status" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

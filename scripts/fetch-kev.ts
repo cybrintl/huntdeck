@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises'
-const URL = 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json'
-const res = await fetch(URL)
+import { recordSourceStatus } from './source-status'
+
+const url = 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json'
+const res = await fetch(url)
 if (!res.ok) {
   throw new Error(`Failed to fetch KEV data: ${res.status} ${res.statusText}`)
 }
@@ -16,4 +18,12 @@ if (
 }
 await mkdir('public/data', { recursive: true })
 await writeFile('public/data/kev.json', JSON.stringify(data, null, 2))
+await recordSourceStatus('kev', {
+  kind: 'vulnerability',
+  source: 'CISA Known Exploited Vulnerabilities',
+  url,
+  fetched_at: new Date().toISOString(),
+  status: 'ok',
+  count: data.vulnerabilities.length,
+})
 console.log(`✅ KEV saved (${data.vulnerabilities.length} vulnerabilities)`)

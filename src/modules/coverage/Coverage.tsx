@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useHypotheses, useRules, useTechniques } from '../../data/snapshots'
 import type { AttackTechnique, HuntHypothesis } from '../../types'
 
@@ -59,8 +59,9 @@ export default function Coverage() {
   const techniqueQuery = useTechniques()
   const hypothesisQuery = useHypotheses()
   const rulesQuery = useRules()
+  const [searchParams] = useSearchParams()
   const [selectedTactic, setSelectedTactic] = useState('')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(() => searchParams.get('technique') ?? '')
   const [referencesOnly, setReferencesOnly] = useState(false)
   const [displayLimit, setDisplayLimit] = useState(30)
   const hypotheses = hypothesisQuery.data ?? []
