@@ -1,0 +1,7 @@
+{
+  "name": "HuntDeck",
+  "short_name": "HD",
+  "start_url": "/huntdeck/",
+  "display": "standalone",
+  "icons": [{ "src": "/huntdeck/favicon.svg", "sizes": "any" }]
+}

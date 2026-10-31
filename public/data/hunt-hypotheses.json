@@ -1,0 +1,9 @@
+[{
+  "id": "hyp-001",
+  "title": "Password Spraying Hunt",
+  "origin": "template:T1110.003",
+  "queries": {
+    "kql": { "language": "KQL", "query": "SecurityEvent | where EventID == 4740" },
+    "spl": { "language": "SPL", "query": "index=wineventlog EventCode=4740" }
+  }
+}]

@@ -1,0 +1,25 @@
+name: Build Data
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run fetch:all
+      - run: npm run build:data
+      - uses: actions/upload-artifact@v4
+        with:
+          name: huntdeck-data
+          path: public/data/*.json
+          if-no-files-found: error
+          retention-days: 7
