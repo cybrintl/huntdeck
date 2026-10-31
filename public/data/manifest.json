@@ -1,1 +1,49 @@
-{"schema_version": 1}
+{
+  "schema_version": 1,
+  "built_at": "2026-10-31T19:20:53.309Z",
+  "counts": {
+    "kev": 1766,
+    "epss": 5819,
+    "techniques": 706,
+    "hypotheses": 10,
+    "iocs": 30000,
+    "rules": 3161,
+    "news": 26
+  },
+  "sources": {
+    "0": {
+      "source": "OpenPhish Community Feed",
+      "fetched_at": "2026-10-31T19:03:36.819Z",
+      "status": "ok",
+      "count": 300
+    },
+    "1": {
+      "source": "DShield Recommended Block List",
+      "fetched_at": "2026-10-31T19:03:36.911Z",
+      "status": "ok",
+      "count": 20
+    },
+    "2": {
+      "source": "CINS Army",
+      "fetched_at": "2026-10-31T19:03:38.643Z",
+      "status": "ok",
+      "count": 15000
+    },
+    "3": {
+      "source": "blocklist.de",
+      "fetched_at": "2026-10-31T19:03:38.925Z",
+      "status": "ok",
+      "count": 25470
+    },
+    "kev": "2026-10-31T19:20:53.309Z",
+    "epss": "2026-10-31T19:20:53.309Z",
+    "attack": "2026-10-31T19:20:53.309Z",
+    "news": {
+      "source": "Curated RSS and Atom feeds",
+      "fetched_at": "2026-10-31T19:20:52.737Z",
+      "status": "ok",
+      "count": 26
+    }
+  },
+  "warnings": []
+}

@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { gunzipSync } from 'node:zlib'
 
 const res = await fetch('https://epss.cyentia.com/epss_scores-current.csv.gz')
@@ -22,7 +22,7 @@ if (cveIndex === -1 || epssIndex === -1) {
   throw new Error('EPSS feed is missing required CVE or score columns')
 }
 
-const data = lines.slice(headerIndex + 1).flatMap(line => {
+const allScores = lines.slice(headerIndex + 1).flatMap(line => {
   if (!line) return []
   const columns = line.split(',')
   const cve = columns[cveIndex]
@@ -35,10 +35,35 @@ const data = lines.slice(headerIndex + 1).flatMap(line => {
     ...(Number.isFinite(percentile) ? { percentile } : {})
   }]
 })
-if (data.length === 0) {
+if (allScores.length === 0) {
   throw new Error('EPSS feed did not contain any valid records')
 }
 
+const kev: unknown = JSON.parse(await readFile('public/data/kev.json', 'utf8'))
+if (
+  typeof kev !== 'object' ||
+  kev === null ||
+  !('vulnerabilities' in kev) ||
+  !Array.isArray(kev.vulnerabilities)
+) {
+  throw new Error('Cannot filter EPSS data: KEV snapshot has an invalid format')
+}
+const kevCves = new Set(
+  kev.vulnerabilities.flatMap(vulnerability =>
+    typeof vulnerability === 'object' &&
+    vulnerability !== null &&
+    'cveID' in vulnerability &&
+    typeof vulnerability.cveID === 'string'
+      ? [vulnerability.cveID]
+      : []
+  )
+)
+const topScores = [...allScores]
+  .sort((a, b) => b.epss - a.epss)
+  .slice(0, 5000)
+const selectedCves = new Set([...kevCves, ...topScores.map(score => score.cve)])
+const data = allScores.filter(score => selectedCves.has(score.cve))
+
 await mkdir('public/data', { recursive: true })
 await writeFile('public/data/epss.json', JSON.stringify(data))
-console.log(`EPSS saved (${data.length} scores)`)
+console.log(`EPSS saved (${data.length} scores: ${kevCves.size} KEV + top 5,000 EPSS)`)

@@ -1,0 +1,29 @@
+{
+  "sources": [
+    {
+      "source": "OpenPhish Community Feed",
+      "fetched_at": "2026-10-31T19:03:36.819Z",
+      "status": "ok",
+      "count": 300
+    },
+    {
+      "source": "DShield Recommended Block List",
+      "fetched_at": "2026-10-31T19:03:36.911Z",
+      "status": "ok",
+      "count": 20
+    },
+    {
+      "source": "CINS Army",
+      "fetched_at": "2026-10-31T19:03:38.643Z",
+      "status": "ok",
+      "count": 15000
+    },
+    {
+      "source": "blocklist.de",
+      "fetched_at": "2026-10-31T19:03:38.925Z",
+      "status": "ok",
+      "count": 25470
+    }
+  ],
+  "warnings": []
+}

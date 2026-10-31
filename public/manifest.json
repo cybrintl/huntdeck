@@ -1,7 +1,10 @@
 {
   "name": "HuntDeck",
   "short_name": "HD",
-  "start_url": "/huntdeck/",
+  "start_url": "./",
   "display": "standalone",
-  "icons": [{ "src": "/huntdeck/favicon.svg", "sizes": "any" }]
+  "background_color": "#f8fafc",
+  "theme_color": "#0f172a",
+  "description": "Offline-capable threat hunting workspace",
+  "icons": [{ "src": "favicon.svg", "sizes": "any" }]
 }
