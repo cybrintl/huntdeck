@@ -360,6 +360,7 @@ function BriefNewsRow({ article }: { article: NewsArticle }) {
           CVE references: {article.cves.slice(0, 3).join(', ')}
         </p>
       )}
+      {article.summary && <p className="mt-2 line-clamp-2 text-sm text-slate-600">{article.summary}</p>}
     </article>
   )
 }

@@ -9,12 +9,16 @@ export interface NewsSource {
 export interface NewsArticle {
   url: string
   title: string
+  summary: string
   source: string
   source_name: string
   published_at?: string
   cves: string[]
   techniques: string[]
   topics: string[]
+  severity?: 'critical' | 'high' | 'medium' | 'low' | 'unknown'
+  cvss?: number
+  tags: string[]
 }
 
 const parser = new XMLParser({
@@ -83,6 +87,19 @@ function cleanTitle(value: unknown): string {
     .slice(0, 240)
 }
 
+function cleanSummary(value: unknown): string {
+  return decodeXmlText(text(value))
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, ' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/[*_`>#]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 360)
+}
+
 function getLink(value: unknown): string {
   for (const candidate of values(value)) {
     const item = record(candidate)
@@ -130,7 +147,8 @@ function parseEntry(entry: unknown, source: NewsSource): NewsArticle | undefined
   if (!title || !url) return undefined
 
   const categories = getCategories(item.category)
-  const evidence = `${title} ${categories.join(' ')}`
+  const summary = cleanSummary(item.description ?? item.summary ?? item.content)
+  const evidence = `${title} ${summary} ${categories.join(' ')}`
   const cves = [...new Set(evidence.match(/\bCVE-\d{4}-\d{4,}\b/gi) ?? [])]
     .map(cve => cve.toUpperCase())
   const techniques = [...new Set(evidence.match(/\bT\d{4}(?:\.\d{3})?\b/gi) ?? [])]
@@ -138,17 +156,29 @@ function parseEntry(entry: unknown, source: NewsSource): NewsArticle | undefined
   const topics = topicRules
     .filter(([, pattern]) => pattern.test(evidence))
     .map(([topic]) => topic)
-  if (cves.length === 0 && techniques.length === 0 && topics.length === 0) return undefined
+  if (cves.length === 0 && techniques.length === 0 && topics.length === 0 && !/\b(?:critical|high|medium|low)\b/i.test(categories.join(' '))) {
+    return undefined
+  }
+  const severity = categories.map(category => category.toLocaleLowerCase())
+    .find((category): category is NonNullable<NewsArticle['severity']> =>
+      ['critical', 'high', 'medium', 'low'].includes(category)
+    )
+  const cvssMatch = evidence.match(/\bCVSS(?:\s+(?:v\d(?:\.\d)?))?\s*[:=]?\s*(\d{1,2}(?:\.\d)?)\b/i)
+  const cvss = cvssMatch ? Number(cvssMatch[1]) : undefined
 
   return {
     url,
     title,
+    summary,
     source: source.id,
     source_name: source.name,
     published_at: parseDate(item.pubDate ?? item.published ?? item.updated ?? item.date),
     cves,
     techniques,
     topics,
+    severity: severity ?? 'unknown',
+    ...(cvss !== undefined && cvss <= 10 ? { cvss } : {}),
+    tags: categories,
   }
 }
 

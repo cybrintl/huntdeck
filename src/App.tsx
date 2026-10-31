@@ -6,7 +6,6 @@ import Library from './modules/hypotheses/Library'
 import Coverage from './modules/coverage/Coverage'
 import Triage from './modules/triage/Triage'
 import Rules from './modules/rules/Rules'
-import Journal from './modules/journal/Journal'
 import Intelligence from './modules/intelligence/Intelligence'
 const qc = new QueryClient()
 export default function App() {
@@ -19,7 +18,6 @@ export default function App() {
         <Route path="coverage" element={<Coverage />} />
         <Route path="triage" element={<Triage />} />
         <Route path="rules" element={<Rules />} />
-        <Route path="journal" element={<Journal />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

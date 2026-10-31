@@ -9,7 +9,7 @@ dirs = [
     ".github/workflows",
     "scripts/ai/fixtures", "scripts/ai/prompts",
     "src/modules/brief", "src/modules/hypotheses", "src/modules/coverage",
-    "src/modules/triage", "src/modules/rules", "src/modules/journal",
+    "src/modules/triage", "src/modules/rules",
     "src/hooks", "src/types", "src/utils",
     "public/data", "docs"
 ]
@@ -23,6 +23,7 @@ files = {
   "name": "huntdeck",
   "private": true,
   "version": "0.1.0",
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -35,8 +36,7 @@ files = {
     "react-router-dom": "^7.6.1",
     "@tanstack/react-query": "^5.80.7",
     "lucide-react": "^0.513.0",
-    "minisearch": "^7.1.1",
-    "idb": "^8.0.0"
+    "minisearch": "^7.1.1"
   },
   "devDependencies": {
     "@types/react": "^19.0.8",

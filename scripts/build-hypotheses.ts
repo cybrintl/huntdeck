@@ -13,6 +13,9 @@ interface HuntTemplate {
   severity: 'high' | 'medium'
   hypothesis: string
   logSources: string[]
+  investigationSteps: string[]
+  validationNotes: string
+  falsePositiveNotes: string
   tags: string[]
   kql: string
   spl: string
@@ -27,6 +30,13 @@ const templates: HuntTemplate[] = [
     severity: 'high',
     hypothesis: 'A source address produces failed logons for many distinct accounts in a short time window.',
     logSources: ['Windows Security Event 4625'],
+    investigationSteps: [
+      'Pivot on the source address and time bucket; review targeted accounts, failure reasons, and whether any authentication succeeded afterward.',
+      'Compare the activity with the source address’s normal role, known VPN or proxy egress, and the affected accounts’ usual sign-in patterns.',
+      'If a success follows the failures, review the account’s subsequent sign-ins and endpoint activity in the same time window.',
+    ],
+    validationNotes: 'Confirm the failure event and account/IP field mappings in your identity logs. Tune the 15-minute window and account threshold to your normal authentication volume.',
+    falsePositiveNotes: 'Shared NAT/VPN egress, identity-provider retries, password-manager errors, and authorized password audits can produce broad failure patterns.',
     tags: ['identity', 'credentials', 'windows'],
     kql: 'SecurityEvent\n| where EventID == 4625\n| summarize target_accounts=dcount(TargetAccount), failures=count() by IpAddress, bin(TimeGenerated, 15m)\n| where target_accounts >= 10',
     spl: 'index=wineventlog EventCode=4625\n| bin _time span=15m\n| stats dc(Account_Name) as target_accounts count as failures by IpAddress _time\n| where target_accounts >= 10',
@@ -39,6 +49,13 @@ const templates: HuntTemplate[] = [
     severity: 'high',
     hypothesis: 'PowerShell launches with encoded, hidden, download, or policy-bypass arguments outside expected administrative activity.',
     logSources: ['Microsoft Defender DeviceProcessEvents', 'Sysmon Event ID 1'],
+    investigationSteps: [
+      'Review the complete process tree, initiating account, host, command line, and whether the parent process is expected for that user and device.',
+      'Pivot to child processes, file writes, script-block or AMSI telemetry, and network connections around the execution time.',
+      'Compare the executable path, signer, hash, and command pattern with approved administration and software-deployment activity.',
+    ],
+    validationNotes: 'Check process command-line and parent-process field availability. The query searches selected strings and will miss other forms of PowerShell abuse.',
+    falsePositiveNotes: 'IT automation, software deployment, endpoint management, and incident-response scripts may use encoded or hidden PowerShell arguments.',
     tags: ['execution', 'powershell', 'windows'],
     kql: 'DeviceProcessEvents\n| where FileName in~ ("powershell.exe", "pwsh.exe")\n| where ProcessCommandLine has_any ("-enc", "-encodedcommand", "-windowstyle hidden", "downloadstring", "-executionpolicy bypass")\n| project Timestamp, DeviceName, AccountName, ProcessCommandLine, InitiatingProcessFileName',
     spl: 'index=sysmon EventCode=1 (Image="*\\\\powershell.exe" OR Image="*\\\\pwsh.exe")\n| where match(lower(CommandLine), "-enc|encodedcommand|windowstyle hidden|downloadstring|executionpolicy bypass")\n| table _time host User Image CommandLine ParentImage',
@@ -51,6 +68,13 @@ const templates: HuntTemplate[] = [
     severity: 'high',
     hypothesis: 'A process other than an approved security or diagnostic tool requests access to LSASS memory.',
     logSources: ['Sysmon Event ID 10', 'Microsoft Defender DeviceProcessEvents'],
+    investigationSteps: [
+      'Identify the requesting process, signer, hash, command line, user, and parent process; confirm whether it belongs to an approved security or diagnostic tool.',
+      'Correlate nearby process creation, memory-access, file-write, and endpoint alert telemetry on the same host.',
+      'Review whether similar access occurs across hosts or is limited to a known maintenance window or software rollout.',
+    ],
+    validationNotes: 'Confirm your sensor records process-access events and that the query’s LSASS and source-process fields are mapped correctly. This is a lead for review, not proof of credential theft.',
+    falsePositiveNotes: 'Endpoint protection, EDR, backup, diagnostics, and approved credential-management software may access LSASS-related processes.',
     tags: ['credential-access', 'lsass', 'windows'],
     kql: 'DeviceEvents\n| where ActionType == "OpenProcessApiCall"\n| where AdditionalFields has "lsass.exe"\n| project Timestamp, DeviceName, InitiatingProcessFileName, InitiatingProcessCommandLine, AccountName',
     spl: 'index=sysmon EventCode=10 TargetImage="*\\\\lsass.exe"\n| stats count values(SourceImage) as source_processes by host SourceUser\n| sort -count',
@@ -63,6 +87,13 @@ const templates: HuntTemplate[] = [
     severity: 'medium',
     hypothesis: 'A new scheduled task is created by an unusual account or with a command path outside approved software locations.',
     logSources: ['Windows Security Event 4698', 'Sysmon Event ID 1'],
+    investigationSteps: [
+      'Inspect the task name, XML action, trigger, principal, creator, and binary or script path.',
+      'Pivot from the creator and action to process, file, and network telemetry around task creation and first execution.',
+      'Compare the task and its execution cadence across similar hosts; check whether it aligns with a change or software deployment.',
+    ],
+    validationNotes: 'Enable and verify task-creation auditing; confirm task XML fields are available and correlate the creation event with process execution telemetry.',
+    falsePositiveNotes: 'Software installers, endpoint-management agents, backup tools, and routine operating-system maintenance create scheduled tasks.',
     tags: ['persistence', 'scheduled-task', 'windows'],
     kql: 'SecurityEvent\n| where EventID == 4698\n| project TimeGenerated, Computer, SubjectAccount, TaskName, TaskContent',
     spl: 'index=wineventlog EventCode=4698\n| table _time host SubjectUserName TaskName TaskContent',
@@ -75,6 +106,13 @@ const templates: HuntTemplate[] = [
     severity: 'high',
     hypothesis: 'A process creates or modifies a common Run or RunOnce key to establish user or system logon persistence.',
     logSources: ['Sysmon Event ID 12/13/14', 'Windows Registry telemetry'],
+    investigationSteps: [
+      'Review the registry value data, user hive, initiating process, signer, file path, and whether the value points to an existing executable.',
+      'Pivot to file creation, process execution, and network events for the referenced binary, then check whether the same value appears on peer hosts.',
+      'Compare the change time and account with software installation, logon, or approved configuration-management activity.',
+    ],
+    validationNotes: 'Confirm registry event coverage and normalize key paths across 32-bit/64-bit views and user hives. Scope monitoring to autorun locations relevant to your environment.',
+    falsePositiveNotes: 'Legitimate applications, installers, and endpoint-management software commonly maintain Run and RunOnce values.',
     tags: ['persistence', 'registry', 'windows'],
     kql: 'DeviceRegistryEvents\n| where RegistryKey has_any ("\\\\CurrentVersion\\\\Run", "\\\\CurrentVersion\\\\RunOnce")\n| project Timestamp, DeviceName, RegistryKey, RegistryValueName, RegistryValueData, InitiatingProcessFileName',
     spl: 'index=sysmon (EventCode=12 OR EventCode=13 OR EventCode=14) TargetObject="*\\\\CurrentVersion\\\\Run*"\n| table _time host User Image TargetObject Details',
@@ -87,6 +125,13 @@ const templates: HuntTemplate[] = [
     severity: 'medium',
     hypothesis: 'Remote interactive logons originate from unusual source addresses or occur across multiple hosts in a short window.',
     logSources: ['Windows Security Event 4624'],
+    investigationSteps: [
+      'Pivot on account, source address, and time; review destination hosts, logon type, authentication package, and nearby failed logons.',
+      'Compare the source and account with approved remote-access gateways, administrator workflows, and the account’s normal host set.',
+      'Review activity after the logon on each destination, including process creation and additional remote logons.',
+    ],
+    validationNotes: 'Validate logon-type and source-IP mappings, and account for NAT, VPN, jump hosts, and event volume before tuning the host-count threshold.',
+    falsePositiveNotes: 'Help-desk support, server administration, VDI, jump hosts, and approved remote-access tools can create broad RDP patterns.',
     tags: ['lateral-movement', 'rdp', 'windows'],
     kql: 'SecurityEvent\n| where EventID == 4624 and LogonType == 10\n| summarize hosts=dcount(Computer), logons=count() by IpAddress, TargetAccount, bin(TimeGenerated, 30m)\n| where hosts > 2',
     spl: 'index=wineventlog EventCode=4624 Logon_Type=10\n| bin _time span=30m\n| stats dc(host) as hosts count as logons by IpAddress TargetUserName _time\n| where hosts > 2',
@@ -99,6 +144,13 @@ const templates: HuntTemplate[] = [
     severity: 'medium',
     hypothesis: 'WMI provider processes launch command interpreters or scripting engines on endpoints where this behavior is uncommon.',
     logSources: ['Sysmon Event ID 1', 'Microsoft Defender DeviceProcessEvents'],
+    investigationSteps: [
+      'Review the WMI provider’s child process, command line, user, parent process, and host role.',
+      'Correlate WMI operational events and remote logons to identify the initiating account and any source host, then pivot to the destination process tree.',
+      'Compare the activity with software management, inventory, and monitoring tools used in the environment.',
+    ],
+    validationNotes: 'Confirm parent-process and WMI event coverage; provider process names can vary, and the query only covers selected child executables.',
+    falsePositiveNotes: 'Configuration management, asset inventory, monitoring, and software deployment platforms often use WMI to launch processes.',
     tags: ['execution', 'wmi', 'windows'],
     kql: 'DeviceProcessEvents\n| where InitiatingProcessFileName in~ ("wmiprvse.exe", "WmiPrvSE.exe")\n| where FileName in~ ("cmd.exe", "powershell.exe", "rundll32.exe", "wscript.exe")\n| project Timestamp, DeviceName, InitiatingProcessFileName, FileName, ProcessCommandLine',
     spl: 'index=sysmon EventCode=1 ParentImage="*\\\\WmiPrvSE.exe"\n| table _time host User Image CommandLine ParentCommandLine',
@@ -111,6 +163,13 @@ const templates: HuntTemplate[] = [
     severity: 'medium',
     hypothesis: 'A valid account authenticates from unusual locations, at unusual times, or across an unexpectedly broad set of hosts.',
     logSources: ['Windows Security Event 4624', 'Identity provider sign-in logs'],
+    investigationSteps: [
+      'Compare the account’s source addresses, devices, locations, authentication methods, and target hosts with its established baseline.',
+      'Review MFA outcomes, conditional-access decisions, nearby failures, and any privileged actions after the sign-in.',
+      'Determine whether the account is human, service, or shared; compare the event with change windows and approved automation.',
+    ],
+    validationNotes: 'Build user- and service-account-aware baselines. Source IP and location can be distorted by proxies, VPNs, cloud egress, and identity-provider normalization.',
+    falsePositiveNotes: 'Travel, VPN use, shared services, scheduled jobs, and changes in cloud egress may create legitimate location or host-count anomalies.',
     tags: ['initial-access', 'identity', 'valid-account'],
     kql: 'SecurityEvent\n| where EventID == 4624\n| summarize source_ips=dcount(IpAddress), hosts=dcount(Computer) by TargetAccount, bin(TimeGenerated, 1h)\n| where source_ips > 3 or hosts > 10',
     spl: 'index=wineventlog EventCode=4624\n| bin _time span=1h\n| stats dc(IpAddress) as source_ips dc(host) as hosts by TargetUserName _time\n| where source_ips > 3 OR hosts > 10',
@@ -123,6 +182,13 @@ const templates: HuntTemplate[] = [
     severity: 'high',
     hypothesis: 'An email attachment is followed by execution of a script, archive utility, or newly written executable on the recipient endpoint.',
     logSources: ['Email gateway telemetry', 'Microsoft Defender DeviceProcessEvents'],
+    investigationSteps: [
+      'Correlate the recipient, message identifier, attachment name/hash, delivery time, and endpoint process start.',
+      'Review the full process tree and any files written or network connections made by the child process; pivot on hashes and affected recipients.',
+      'Check whether the same attachment or sender appears in other mailboxes and whether the execution pattern matches approved business software.',
+    ],
+    validationNotes: 'Join mail and endpoint events using stable message, recipient, file, or time identifiers. Email-client parentage alone is incomplete and does not establish that a file came from email.',
+    falsePositiveNotes: 'Legitimate document workflows, add-ins, browser-based mail, and security tools can create similar parent-child or file-execution patterns.',
     tags: ['phishing', 'initial-access', 'email'],
     kql: 'DeviceProcessEvents\n| where FileName in~ ("wscript.exe", "cscript.exe", "mshta.exe", "rundll32.exe")\n| where InitiatingProcessFileName in~ ("outlook.exe", "winword.exe", "excel.exe")\n| project Timestamp, DeviceName, AccountName, InitiatingProcessFileName, FileName, ProcessCommandLine',
     spl: 'index=sysmon EventCode=1 (ParentImage="*\\\\OUTLOOK.EXE" OR ParentImage="*\\\\WINWORD.EXE" OR ParentImage="*\\\\EXCEL.EXE")\n| table _time host User Image CommandLine ParentImage',
@@ -135,6 +201,13 @@ const templates: HuntTemplate[] = [
     severity: 'medium',
     hypothesis: 'A Windows command shell launches with discovery, download, encoded, or chained execution arguments.',
     logSources: ['Sysmon Event ID 1', 'Microsoft Defender DeviceProcessEvents'],
+    investigationSteps: [
+      'Review the full command line, parent process, user, device role, and neighboring commands in the same process tree.',
+      'Pivot on referenced files, child processes, destination addresses, and related discovery or authentication events.',
+      'Compare the activity with approved scripts, software deployment, troubleshooting, and administrative sessions.',
+    ],
+    validationNotes: 'String matching is a starting point, not behavioral proof. Confirm command-line collection and adjust terms for localization, quoting, and your telemetry schema.',
+    falsePositiveNotes: 'System administration, installers, support scripts, and endpoint-management tools routinely use command shells and common discovery commands.',
     tags: ['execution', 'command-shell', 'windows'],
     kql: 'DeviceProcessEvents\n| where FileName =~ "cmd.exe"\n| where ProcessCommandLine has_any ("whoami", "nltest", "net user", "certutil", "bitsadmin", "&&")\n| project Timestamp, DeviceName, AccountName, ProcessCommandLine, InitiatingProcessFileName',
     spl: 'index=sysmon EventCode=1 Image="*\\\\cmd.exe"\n| where match(lower(CommandLine), "whoami|nltest|net user|certutil|bitsadmin|&&")\n| table _time host User CommandLine ParentImage',
@@ -159,6 +232,9 @@ const hypotheses = templates.map(template => {
     why: 'Deterministic analyst-authored hunt template. Validate table names and event fields against your telemetry before running.',
     log_sources: template.logSources,
     hypothesis: template.hypothesis,
+    investigation_steps: template.investigationSteps,
+    validation_notes: template.validationNotes,
+    false_positive_notes: template.falsePositiveNotes,
     queries: {
       kql: { language: 'KQL · Sentinel / Defender', query: template.kql },
       spl: { language: 'SPL · Splunk', query: template.spl },

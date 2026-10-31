@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "built_at": "2026-10-31T19:20:53.309Z",
+  "built_at": "2026-10-31T21:59:52.774Z",
   "counts": {
     "kev": 1766,
     "epss": 5819,
@@ -8,7 +8,7 @@
     "hypotheses": 10,
     "iocs": 30000,
     "rules": 3161,
-    "news": 26
+    "news": 44
   },
   "sources": {
     "0": {
@@ -35,14 +35,14 @@
       "status": "ok",
       "count": 25470
     },
-    "kev": "2026-10-31T19:20:53.309Z",
-    "epss": "2026-10-31T19:20:53.309Z",
-    "attack": "2026-10-31T19:20:53.309Z",
+    "kev": "2026-10-31T21:59:52.774Z",
+    "epss": "2026-10-31T21:59:52.774Z",
+    "attack": "2026-10-31T21:59:52.774Z",
     "news": {
-      "source": "Curated RSS and Atom feeds",
-      "fetched_at": "2026-10-31T19:20:52.737Z",
+      "source": "OffSec Radar RSS",
+      "fetched_at": "2026-10-31T21:43:04.796Z",
       "status": "ok",
-      "count": 26
+      "count": 44
     }
   },
   "warnings": []

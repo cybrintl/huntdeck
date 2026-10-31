@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useEpss, useKev, useNews } from '../../data/snapshots'
-import type { NewsArticle } from '../../types'
+import { useEpss, useHypotheses, useKev, useNews } from '../../data/snapshots'
+import type { HuntHypothesis, NewsArticle } from '../../types'
+import { findRelatedHunts } from '../../utils/hunt-links'
 
 const timeWindows = [
   { value: '1', label: 'Past 24 hours' },
   { value: '7', label: 'Past 7 days' },
   { value: '30', label: 'Past 30 days' },
 ]
+const severityLevels = ['critical', 'high', 'medium', 'low', 'unknown'] as const
 
 function formatDate(value?: string): string {
   if (!value) return 'Date unavailable'
@@ -21,9 +23,11 @@ export default function Intelligence() {
   const news = useNews()
   const kev = useKev()
   const epss = useEpss()
+  const hypotheses = useHypotheses()
   const [search, setSearch] = useState('')
   const [sourceFilter, setSourceFilter] = useState('')
   const [topicFilter, setTopicFilter] = useState('')
+  const [severityFilter, setSeverityFilter] = useState('')
   const [timeWindow, setTimeWindow] = useState('7')
   const items = news.data?.items ?? []
   const kevCves = useMemo(
@@ -43,14 +47,16 @@ export default function Intelligence() {
     const query = search.trim().toLocaleLowerCase()
     const cutoff = Date.now() - Number(timeWindow) * 24 * 60 * 60 * 1000
     return items.filter(item => {
-      const searchable = `${item.title} ${item.cves.join(' ')} ${item.topics.join(' ')}`.toLocaleLowerCase()
+      const searchable = `${item.title} ${item.summary} ${item.cves.join(' ')} ${item.topics.join(' ')} ${item.tags.join(' ')}`
+        .toLocaleLowerCase()
       const withinWindow = Boolean(item.published_at && Date.parse(item.published_at) >= cutoff)
       return (!query || searchable.includes(query)) &&
         (!sourceFilter || item.source === sourceFilter) &&
         (!topicFilter || item.topics.includes(topicFilter)) &&
+        (!severityFilter || item.severity === severityFilter) &&
         withinWindow
     }).sort((a, b) => (b.published_at ?? '').localeCompare(a.published_at ?? ''))
-  }, [items, search, sourceFilter, topicFilter, timeWindow])
+  }, [items, search, sourceFilter, topicFilter, severityFilter, timeWindow])
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -59,8 +65,8 @@ export default function Intelligence() {
           <p className="text-sm font-semibold uppercase tracking-widest text-sky-700">Research signals</p>
           <h1 className="mt-2 text-3xl font-bold text-slate-950">Intel leads</h1>
           <p className="mt-2 max-w-3xl text-slate-600">
-            Recent security research with CVEs matched against local KEV/EPSS data and ATT&amp;CK references
-            linked to coverage. Headlines only; open the source for full reporting.
+            Recent threat and vulnerability reports with CVEs matched against KEV/EPSS data and ATT&amp;CK
+            references linked to indexed hunts. Open the source for full reporting.
           </p>
         </div>
         <Link className="button-secondary" to="/">Back to daily brief</Link>
@@ -70,7 +76,11 @@ export default function Intelligence() {
         {sources.map(source => (
           <article className="rounded-xl border border-slate-200 bg-white p-4" key={source.id}>
             <div className="flex items-center justify-between gap-2">
-              <h2 className="font-semibold text-slate-900">{source.name}</h2>
+              <h2 className="font-semibold text-slate-900">
+                <a className="hover:text-sky-800 hover:underline" href={source.url} target="_blank" rel="noreferrer">
+                  {source.name}
+                </a>
+              </h2>
               <span className={source.status === 'ok' ? 'badge-success' : 'badge-warning'}>
                 {source.status === 'ok' ? 'Current' : 'Using last snapshot'}
               </span>
@@ -98,7 +108,7 @@ export default function Intelligence() {
         </p>
       )}
 
-      <section aria-label="Filter research headlines" className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section aria-label="Filter research headlines" className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-5">
         <label className="lg:col-span-2">
           <span className="field-label">Search headlines, CVEs, and topics</span>
           <input className="field-input" type="search" value={search}
@@ -117,8 +127,17 @@ export default function Intelligence() {
             {timeWindows.map(window => <option key={window.value} value={window.value}>{window.label}</option>)}
           </select>
         </label>
+        <label>
+          <span className="field-label">Severity</span>
+          <select className="field-input" value={severityFilter} onChange={event => setSeverityFilter(event.target.value)}>
+            <option value="">All severities</option>
+            {severityLevels.map(severity => <option key={severity} value={severity}>
+              {severity === 'unknown' ? 'Unrated' : severity}
+            </option>)}
+          </select>
+        </label>
         {topics.length > 0 && (
-          <label className="sm:col-span-2 lg:col-span-4">
+          <label className="sm:col-span-2 lg:col-span-5">
             <span className="field-label">Topic</span>
             <select className="field-input" value={topicFilter} onChange={event => setTopicFilter(event.target.value)}>
               <option value="">All topics</option>
@@ -129,7 +148,7 @@ export default function Intelligence() {
       </section>
 
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-xl font-bold text-slate-950">Recent research</h2>
+        <h2 className="text-xl font-bold text-slate-950">Recent threat reports</h2>
         <span className="text-sm text-slate-500">{filtered.length} of {items.length} headlines</span>
       </div>
 
@@ -143,6 +162,9 @@ export default function Intelligence() {
               key={article.url}
               isKev={cve => kevCves.has(cve)}
               getEpss={cve => epssByCve.get(cve)}
+              relatedHunts={findRelatedHunts(article.techniques, hypotheses.data ?? [])}
+              hypothesesLoading={hypotheses.isLoading}
+              hypothesesError={hypotheses.error?.message}
             />
           ))}
         </section>
@@ -169,10 +191,16 @@ function NewsCard({
   article,
   isKev,
   getEpss,
+  relatedHunts,
+  hypothesesLoading,
+  hypothesesError,
 }: {
   article: NewsArticle
   isKev: (cve: string) => boolean
   getEpss: (cve: string) => number | undefined
+  relatedHunts: Array<{ hypothesis: HuntHypothesis; technique: string }>
+  hypothesesLoading: boolean
+  hypothesesError?: string
 }) {
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -185,9 +213,16 @@ function NewsCard({
           <span className="sr-only"> (opens source in a new tab)</span>
         </a>
       </h3>
-      {(article.topics.length > 0 || article.cves.length > 0 || article.techniques.length > 0) && (
+      {article.summary && <p className="mt-3 text-sm leading-relaxed text-slate-600">{article.summary}</p>}
+      {(article.topics.length > 0 || article.cves.length > 0 || article.techniques.length > 0 ||
+        article.tags.length > 0 || article.severity !== 'unknown') && (
         <div className="mt-3 flex flex-wrap gap-2">
           {article.topics.map(topic => <span className="badge-muted" key={topic}>{topic}</span>)}
+          {article.severity && article.severity !== 'unknown' && (
+            <span className={article.severity === 'critical' ? 'badge-warning' : 'badge'}>
+              {article.severity.toUpperCase()}{article.cvss !== undefined ? ` · CVSS ${article.cvss}` : ''}
+            </span>
+          )}
           {article.cves.map(cve => {
             const score = getEpss(cve)
             return (
@@ -199,9 +234,41 @@ function NewsCard({
             )
           })}
           {article.techniques.map(technique => (
-            <Link className="badge" key={technique} to="/coverage">{technique}</Link>
+            <Link className="badge" key={technique}
+              to={`/hypotheses?technique=${encodeURIComponent(technique)}`}>{technique}</Link>
           ))}
+          {article.tags
+            .filter(tag => !severityLevels.some(severity => severity === tag.toLowerCase()))
+            .slice(0, 3)
+            .map(tag => <span className="badge-muted" key={tag}>{tag}</span>)}
         </div>
+      )}
+      {article.techniques.length > 0 && (
+        <section className="mt-4 border-t border-slate-100 pt-3" aria-label="Related indexed hunts">
+          <h4 className="text-sm font-semibold text-slate-900">Related indexed hunts</h4>
+          {hypothesesError ? (
+            <p className="mt-1 text-xs text-red-800" role="alert">
+              Could not load the hunt index: {hypothesesError}
+            </p>
+          ) : hypothesesLoading ? (
+            <p className="mt-1 text-xs text-slate-600">Loading related hunt index…</p>
+          ) : relatedHunts.length > 0 ? (
+            <ul className="mt-2 space-y-1">
+              {relatedHunts.slice(0, 4).map(({ hypothesis, technique }) => (
+                <li key={hypothesis.id}>
+                  <Link className="text-sm font-medium text-sky-800 hover:underline"
+                    to={`/hypotheses?technique=${encodeURIComponent(technique)}`}>
+                    {hypothesis.title} <span className="text-xs text-slate-500">({technique})</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1 text-xs text-slate-600">
+              No indexed hypothesis currently maps to the ATT&amp;CK references extracted from this report.
+            </p>
+          )}
+        </section>
       )}
     </article>
   )

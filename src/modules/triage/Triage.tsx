@@ -43,9 +43,9 @@ export default function Triage() {
     <div className="mx-auto max-w-7xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-widest text-sky-700">Offline workbench</p>
+          <p className="text-sm font-semibold uppercase tracking-widest text-sky-700">Browser-only analysis</p>
           <h1 className="mt-2 text-3xl font-bold text-slate-950">IOC triage</h1>
-          <p className="mt-2 text-slate-600">Extract and check indicators against the locally published snapshots.</p>
+          <p className="mt-2 text-slate-600">Extract indicators from text and compare them with HuntDeck’s published snapshots.</p>
         </div>
         <Link className="button-secondary" to="/">Back to daily brief</Link>
       </header>
@@ -71,7 +71,7 @@ export default function Triage() {
         <div className="mt-3 flex flex-wrap gap-2">
           <button className="button-primary" disabled={loading || input.trim().length === 0}
             onClick={() => setSubmitted(true)}>
-            {loading ? 'Loading local snapshot…' : 'Extract and check locally'}
+            {loading ? 'Loading snapshots…' : 'Extract and check in browser'}
           </button>
           <button className="button-secondary" onClick={() => {
             setInput(sample)

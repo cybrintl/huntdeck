@@ -58,7 +58,7 @@ const manifest = {
     attack: builtAt,
     ...sourceStatus.sources,
     news: {
-      source: 'Curated RSS and Atom feeds',
+      source: 'OffSec Radar RSS',
       fetched_at: news.built_at,
       status: news.sources.every(source =>
         typeof source === 'object' &&

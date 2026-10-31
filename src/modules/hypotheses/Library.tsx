@@ -1,40 +1,19 @@
 import MiniSearch from 'minisearch'
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useHypotheses } from '../../data/snapshots'
-import type { HuntHypothesis, HuntState, HuntStatus, JournalEntry } from '../../types'
-import { getHuntStates, saveHuntState, saveJournalEntry } from '../../storage/user-store'
-
-const statuses: { value: HuntStatus; label: string }[] = [
-  { value: 'backlog', label: 'Backlog' },
-  { value: 'hunting', label: 'Hunting' },
-  { value: 'covered', label: 'Covered' },
-  { value: 'not_relevant', label: 'Not relevant' },
-]
+import type { HuntHypothesis } from '../../types'
 
 export default function Library() {
   const query = useHypotheses()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
-  const [techniqueFilter, setTechniqueFilter] = useState('')
+  const techniqueFilter = searchParams.get('technique') ?? ''
   const [severityFilter, setSeverityFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateThrough, setDateThrough] = useState('')
   const [reviewOnly, setReviewOnly] = useState(false)
-  const [states, setStates] = useState<Record<string, HuntState>>({})
-  const [storeError, setStoreError] = useState('')
-  const [notice, setNotice] = useState('')
   const hypotheses = query.data ?? []
-
-  useEffect(() => {
-    let active = true
-    getHuntStates().then(items => {
-      if (active) setStates(Object.fromEntries(items.map(item => [item.id, item])))
-    }).catch(error => {
-      if (active) setStoreError(error instanceof Error ? error.message : 'Could not load local hunt state')
-    })
-    return () => { active = false }
-  }, [])
 
   const searchIndex = useMemo(() => {
     const index = new MiniSearch({
@@ -62,58 +41,61 @@ export default function Library() {
       ? new Map(searchResults.map((result, index) => [String(result.id), index]))
       : undefined
     return hypotheses.filter(hypothesis => {
-      const state = states[hypothesis.id]?.status ?? 'backlog'
       const date = hypothesis.date?.slice(0, 10)
       return (!searchIds || searchIds.has(hypothesis.id)) &&
         (!techniqueFilter || hypothesis.attack_techniques?.includes(techniqueFilter)) &&
         (!severityFilter || hypothesis.severity === severityFilter) &&
         (!dateFrom || Boolean(date && date >= dateFrom)) &&
         (!dateThrough || Boolean(date && date <= dateThrough)) &&
-        (!statusFilter || state === statusFilter) &&
-        (!reviewOnly || (hypothesis.needs_review && !states[hypothesis.id]?.reviewed))
+        (!reviewOnly || hypothesis.needs_review)
     }).sort((a, b) => {
       if (searchOrder) return (searchOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
         (searchOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER)
       return (b.date ?? '').localeCompare(a.date ?? '')
     })
-  }, [hypotheses, searchIndex, search, techniqueFilter, severityFilter, dateFrom, dateThrough, statusFilter, reviewOnly, states])
+  }, [hypotheses, searchIndex, search, techniqueFilter, severityFilter, dateFrom, dateThrough, reviewOnly])
 
-  async function updateState(hypothesis: HuntHypothesis, status: HuntStatus, note: string, reviewed?: boolean) {
-    const state: HuntState = {
-      id: hypothesis.id,
-      status,
-      note,
-      updated_at: new Date().toISOString(),
-      reviewed: reviewed ?? states[hypothesis.id]?.reviewed,
-    }
-    try {
-      await saveHuntState(state)
-      setStates(previous => ({ ...previous, [state.id]: state }))
-      setStoreError('')
-      setNotice(`Saved status for “${hypothesis.title}” on this device.`)
-    } catch (error) {
-      setStoreError(error instanceof Error ? error.message : 'Could not save local hunt state')
-    }
+  function setTechniqueFilter(value: string) {
+    const nextParams = new URLSearchParams(searchParams)
+    if (value) nextParams.set('technique', value)
+    else nextParams.delete('technique')
+    setSearchParams(nextParams, { replace: true })
   }
 
-  async function logHunt(hypothesis: HuntHypothesis) {
-    const entry: JournalEntry = {
-      id: crypto.randomUUID(),
-      hypothesis_id: hypothesis.id,
-      title: hypothesis.title,
-      date: new Date().toISOString(),
-      analyst: '',
-      result: 'nothing_found',
-      notes: '',
-      evidence: '',
-    }
-    try {
-      await saveJournalEntry(entry)
-      setNotice(`Logged “${hypothesis.title}” locally. Journal entries stay in this browser.`)
-      setStoreError('')
-    } catch (error) {
-      setStoreError(error instanceof Error ? error.message : 'Could not save this hunt locally')
-    }
+  function exportFilteredHunts() {
+    const content = [
+      '# HuntDeck Hunt Pack',
+      '',
+      `Exported ${new Date().toISOString()}`,
+      '',
+      ...filtered.flatMap(hypothesis => [
+        `## ${hypothesis.title}`,
+        '',
+        hypothesis.hypothesis ?? '',
+        '',
+        ...(hypothesis.attack_techniques?.length
+          ? [`ATT&CK: ${hypothesis.attack_techniques.join(', ')}`, '']
+          : []),
+        ...(hypothesis.log_sources?.length
+          ? [`Telemetry: ${hypothesis.log_sources.join(', ')}`, '']
+          : []),
+        ...(hypothesis.investigation_steps?.length
+          ? ['### Investigation steps', ...hypothesis.investigation_steps.map(step => `- ${step}`), '']
+          : []),
+        ...(hypothesis.validation_notes ? [`**Validation:** ${hypothesis.validation_notes}`, ''] : []),
+        ...(hypothesis.false_positive_notes ? [`**Potential false positives:** ${hypothesis.false_positive_notes}`, ''] : []),
+        ...Object.values(hypothesis.queries).flatMap(query =>
+          query ? [`### ${query.language}`, '', '```', query.query, '```', ''] : []
+        ),
+      ]),
+      '> Validate query fields and thresholds against your telemetry before use.',
+    ].join('\n')
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/markdown' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `huntdeck-hunt-pack-${new Date().toISOString().slice(0, 10)}.md`
+    anchor.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -122,12 +104,17 @@ export default function Library() {
         <div>
           <p className="text-sm font-semibold uppercase tracking-widest text-sky-700">Hunt library</p>
           <h1 className="mt-2 text-3xl font-bold text-slate-950">Hypotheses</h1>
-          <p className="mt-2 text-slate-600">Search deterministic, copyable hunts and track your local progress.</p>
+          <p className="mt-2 text-slate-600">Search and adapt deterministic, copyable hunt ideas for your telemetry.</p>
         </div>
-        <Link className="button-secondary" to="/">Back to daily brief</Link>
+        <div className="flex gap-2">
+          <button className="button-secondary" disabled={filtered.length === 0} onClick={exportFilteredHunts}>
+            Export filtered hunt pack
+          </button>
+          <Link className="button-secondary" to="/">Back to daily brief</Link>
+        </div>
       </header>
 
-      <section aria-label="Hypothesis filters" className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-2 xl:grid-cols-7">
+      <section aria-label="Hypothesis filters" className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-2 xl:grid-cols-6">
         <label className="xl:col-span-2">
           <span className="field-label">Search</span>
           <input className="field-input" type="search" value={search}
@@ -150,13 +137,6 @@ export default function Library() {
           </select>
         </label>
         <label>
-          <span className="field-label">Hunt status</span>
-          <select className="field-input" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
-            <option value="">All statuses</option>
-            {statuses.map(status => <option key={status.value} value={status.value}>{status.label}</option>)}
-          </select>
-        </label>
-        <label>
           <span className="field-label">Date from</span>
           <input className="field-input" type="date" value={dateFrom} onChange={event => setDateFrom(event.target.value)} />
         </label>
@@ -164,14 +144,12 @@ export default function Library() {
           <span className="field-label">Date through</span>
           <input className="field-input" type="date" value={dateThrough} onChange={event => setDateThrough(event.target.value)} />
         </label>
-        <label className="flex items-center gap-2 text-sm text-slate-700 md:col-span-2 xl:col-span-7">
+        <label className="flex items-center gap-2 text-sm text-slate-700 md:col-span-2 xl:col-span-6">
           <input type="checkbox" checked={reviewOnly} onChange={event => setReviewOnly(event.target.checked)} />
           Show only hypotheses needing review
         </label>
       </section>
 
-      {notice && <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900" role="status">{notice}</p>}
-      {storeError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-900" role="alert">{storeError}</p>}
       {query.isError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-900" role="alert">{query.error.message}</p>}
 
       <p className="text-sm text-slate-500">
@@ -182,13 +160,6 @@ export default function Library() {
           <HypothesisCard
             key={hypothesis.id}
             hypothesis={hypothesis}
-            state={states[hypothesis.id]}
-            onSave={updateState}
-            onLog={logHunt}
-            onPromote={async item => {
-              await updateState(item, states[item.id]?.status ?? 'backlog', states[item.id]?.note ?? '', true)
-              setNotice(`“${item.title}” marked reviewed on this device.`)
-            }}
           />
         ))}
         {!query.isLoading && filtered.length === 0 && (
@@ -203,27 +174,12 @@ export default function Library() {
 
 function HypothesisCard({
   hypothesis,
-  state,
-  onSave,
-  onLog,
-  onPromote,
 }: {
   hypothesis: HuntHypothesis
-  state?: HuntState
-  onSave: (hypothesis: HuntHypothesis, status: HuntStatus, note: string, reviewed?: boolean) => Promise<void>
-  onLog: (hypothesis: HuntHypothesis) => Promise<void>
-  onPromote: (hypothesis: HuntHypothesis) => Promise<void>
 }) {
-  const [status, setStatus] = useState<HuntStatus>(state?.status ?? 'backlog')
-  const [note, setNote] = useState(state?.note ?? '')
   const [activeQuery, setActiveQuery] = useState(Object.keys(hypothesis.queries)[0] ?? '')
   const [copyError, setCopyError] = useState('')
   const query = hypothesis.queries[activeQuery as keyof typeof hypothesis.queries]
-
-  useEffect(() => {
-    setStatus(state?.status ?? 'backlog')
-    setNote(state?.note ?? '')
-  }, [state])
 
   async function copyQuery() {
     if (!query) return
@@ -242,7 +198,7 @@ function HypothesisCard({
           <h2 className="text-lg font-semibold text-slate-950">{hypothesis.title}</h2>
           <p className="mt-1 text-xs text-slate-500">{hypothesis.id}{hypothesis.origin ? ` · ${hypothesis.origin}` : ''}</p>
         </div>
-        {hypothesis.needs_review && !state?.reviewed && <span className="badge-warning">AI draft · needs review</span>}
+        {hypothesis.needs_review && <span className="badge-warning">Review recommended</span>}
       </div>
 
       {hypothesis.hypothesis && <p className="mt-4 text-sm text-slate-700">{hypothesis.hypothesis}</p>}
@@ -254,6 +210,20 @@ function HypothesisCard({
       </div>
       {hypothesis.log_sources && hypothesis.log_sources.length > 0 && (
         <p className="mt-3 text-xs text-slate-600"><strong>Log sources:</strong> {hypothesis.log_sources.join(', ')}</p>
+      )}
+      {hypothesis.investigation_steps && hypothesis.investigation_steps.length > 0 && (
+        <section className="mt-4 rounded-lg bg-slate-50 p-3">
+          <h3 className="text-sm font-semibold text-slate-900">Investigation pivots</h3>
+          <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-700">
+            {hypothesis.investigation_steps.map(step => <li key={step}>{step}</li>)}
+          </ol>
+        </section>
+      )}
+      {(hypothesis.validation_notes || hypothesis.false_positive_notes) && (
+        <div className="mt-3 space-y-2 text-xs leading-relaxed text-slate-600">
+          {hypothesis.validation_notes && <p><strong>Validation:</strong> {hypothesis.validation_notes}</p>}
+          {hypothesis.false_positive_notes && <p><strong>Potential false positives:</strong> {hypothesis.false_positive_notes}</p>}
+        </div>
       )}
 
       <div className="mt-4">
@@ -285,27 +255,6 @@ function HypothesisCard({
         {copyError && <p className="mt-2 text-xs text-red-700" role="alert">{copyError}</p>}
       </div>
 
-      <div className="mt-5 grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2">
-        <label>
-          <span className="field-label">My hunt status</span>
-          <select className="field-input" value={status} onChange={event => setStatus(event.target.value as HuntStatus)}>
-            {statuses.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
-          </select>
-        </label>
-        <label>
-          <span className="field-label">Private note (stored on this device)</span>
-          <input className="field-input" value={note} onChange={event => setNote(event.target.value)} maxLength={500}
-            placeholder="Optional analyst note" />
-        </label>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button className="button-primary" onClick={() => void onSave(hypothesis, status, note)}>Save local status</button>
-        <button className="button-secondary" onClick={() => void onLog(hypothesis)}>Log this hunt</button>
-        {hypothesis.needs_review && !state?.reviewed && (
-          <button className="button-secondary" onClick={() => void onPromote(hypothesis)}>Mark reviewed locally</button>
-        )}
-        {hypothesis.needs_review && state?.reviewed && <span className="badge-success">Reviewed on this device</span>}
-      </div>
     </article>
   )
 }

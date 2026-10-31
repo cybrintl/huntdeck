@@ -19,25 +19,16 @@ interface NewsSnapshot {
 
 const sources: NewsSource[] = [
   {
-    id: 'microsoft-security',
-    name: 'Microsoft Security Blog',
-    url: 'https://www.microsoft.com/en-us/security/blog/feed/',
-  },
-  {
-    id: 'unit42',
-    name: 'Palo Alto Networks Unit 42',
-    url: 'https://unit42.paloaltonetworks.com/feed/',
-  },
-  {
-    id: 'cisco-talos',
-    name: 'Cisco Talos Blog',
-    url: 'https://blog.talosintelligence.com/rss/',
+    id: 'offsec-radar',
+    name: 'OffSec Radar',
+    url: 'https://radar.offseq.com/rss.xml',
   },
 ]
 
 const snapshotPath = 'public/data/news.json'
 const maximumFeedBytes = 2_000_000
 const maximumAge = 30 * 24 * 60 * 60 * 1000
+const maximumItems = 200
 
 async function readPrevious(): Promise<NewsSnapshot> {
   try {
@@ -88,14 +79,19 @@ for (const source of sources) {
     const articles = parseNewsFeed(await fetchFeed(source), source)
       .filter(article => !article.published_at || Date.parse(article.published_at) >= cutoff)
       .sort((a, b) => (b.published_at ?? '').localeCompare(a.published_at ?? ''))
-      .slice(0, 30)
-
-    for (const article of articles) items.set(article.url, article)
+    const seen = new Set<string>()
+    for (const article of articles) {
+      const signature = `${article.title.toLocaleLowerCase().replace(/\s+/g, ' ').trim()}|${article.cves.join(',')}`
+      if (seen.has(signature)) continue
+      seen.add(signature)
+      items.set(article.url, article)
+      if (seen.size >= maximumItems) break
+    }
     sourceStatuses.push({
       ...source,
       fetched_at: new Date().toISOString(),
       status: 'ok',
-      count: articles.length,
+      count: seen.size,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -117,7 +113,7 @@ const snapshot: NewsSnapshot = {
   items: [...items.values()]
     .filter(article => !article.published_at || Date.parse(article.published_at) >= cutoff)
     .sort((a, b) => (b.published_at ?? '').localeCompare(a.published_at ?? ''))
-    .slice(0, 75),
+    .slice(0, maximumItems),
   sources: sourceStatuses,
   warnings,
 }

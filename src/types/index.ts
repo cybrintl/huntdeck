@@ -1,5 +1,4 @@
 export type QueryLanguage = 'kql' | 'spl' | 'elastic' | 'sigma'
-export type HuntStatus = 'backlog' | 'hunting' | 'covered' | 'not_relevant'
 
 export interface HuntQuery {
   language: string
@@ -20,6 +19,9 @@ export interface HuntHypothesis {
   why_sources?: string[]
   log_sources?: string[]
   hypothesis?: string
+  investigation_steps?: string[]
+  validation_notes?: string
+  false_positive_notes?: string
   queries: Partial<Record<QueryLanguage, HuntQuery>>
   tags?: string[]
   ai?: { relevance_score?: number; summary?: string; cluster_id?: string }
@@ -67,27 +69,6 @@ export interface DataManifest {
   ai?: { model?: string; golden_set_accuracy?: number | null; skipped?: boolean }
 }
 
-export interface HuntState {
-  id: string
-  status: HuntStatus
-  note: string
-  updated_at: string
-  reviewed?: boolean
-}
-
-export type HuntResult = 'true_positive' | 'false_positive' | 'nothing_found' | 'detection_gap'
-
-export interface JournalEntry {
-  id: string
-  hypothesis_id?: string
-  title: string
-  date: string
-  analyst: string
-  result: HuntResult
-  notes: string
-  evidence: string
-}
-
 export type IOCType = 'ip' | 'domain' | 'url' | 'md5' | 'sha1' | 'sha256' | 'cve' | 'attack'
 
 export interface IOCRecord {
@@ -116,12 +97,16 @@ export interface DetectionRule {
 export interface NewsArticle {
   url: string
   title: string
+  summary: string
   source: string
   source_name: string
   published_at?: string
   cves: string[]
   techniques: string[]
   topics: string[]
+  severity?: 'critical' | 'high' | 'medium' | 'low' | 'unknown'
+  cvss?: number
+  tags: string[]
 }
 
 export interface NewsSourceStatus {
@@ -140,12 +125,6 @@ export interface NewsSnapshot {
   warnings: string[]
 }
 
-export interface RuleDeploymentState {
-  id: string
-  status: 'deployed' | 'not_deployed' | 'na'
-  updated_at: string
-}
-
 export interface AttackTechnique {
   id: string
   name: string
@@ -155,19 +134,4 @@ export interface AttackTechnique {
   trending_score?: number
   cves?: string[]
   atomic_tests?: string[]
-}
-
-export interface CoverageOverride {
-  id: string
-  score: number
-  comment: string
-  updated_at: string
-}
-
-export interface JournalDraft {
-  id: string
-  title: string
-  source_entry_id: string
-  created_at: string
-  notes: string
 }

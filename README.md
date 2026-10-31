@@ -1,10 +1,24 @@
 # HuntDeck
 
-HuntDeck is a static, browser-based threat-hunting workspace. It has no application server, credentials, analytics, or runtime calls to third-party intelligence services. Analyst notes, status, and evidence are stored in the browser's IndexedDB.
+HuntDeck is a public, browser-based threat-hunting and threat-intelligence reference. It is designed for hunting teams, threat intelligence analysts, detection engineers, and SOC analysts—not as a personal hunt tracker.
 
-The product takes inspiration from [ThreatFeed](https://github.com/jozeta/ThreatFeed)'s client-side security intelligence briefing concept. HuntDeck is a separate, hunt-first implementation: research headlines are supporting signals for analyst workflows, not a general-purpose news reader.
+The site is static: no account, application server, analytics, or server-side user data. The browser reads published JSON snapshots. IOC text submitted to the triage page is processed in memory in that browser and is not uploaded. The only saved browser preference is the selected visual theme.
 
-## Local development
+HuntDeck takes product inspiration from [OffSec Radar](https://radar.offseq.com/) and other public threat-intelligence tools. Its priority is actionable hunting context: hypotheses, telemetry guidance, reusable queries, ATT&CK references, detection content, and supporting vulnerability, indicator, and threat-report data.
+
+## What it provides
+
+- **Daily brief:** current snapshot counts and freshness, high-priority hunt ideas, KEV/EPSS context, and recent threat-report leads.
+- **Hunt library:** searchable hypotheses with ATT&CK mappings, telemetry guidance, investigation pivots, validation caveats, false-positive considerations, and KQL/SPL/Elastic/Sigma examples. Export the currently filtered hunts as a portable Markdown hunt pack.
+- **Technique map:** ATT&CK techniques linked to indexed hypotheses and detection rules. This is a content index, not a claim about any organization's deployed coverage.
+- **IOC triage:** extract and compare indicators in the browser with published IOC/KEV snapshots; export results as CSV or STIX 2.1.
+- **Detection rules:** search Sigma metadata, ATT&CK references, and available query examples.
+- **Intel leads:** recent OffSec Radar threat reports with short summaries, severity/CVSS, CVEs, and links to the source. Extracted ATT&CK references link directly to matching hypotheses when available.
+- **Themes:** Light, Dark, Ocean, and Forest, with the selected appearance stored only in local browser preferences.
+
+Data is informational and may be incomplete. Verify source reports, validate query fields against your own telemetry, and do not treat an IOC absent from a snapshot as safe.
+
+## Run locally
 
 ```sh
 npm ci
@@ -15,32 +29,26 @@ Quality checks:
 
 ```sh
 npm test
+npm run validate:snapshots
 npm run typecheck
 npm run build
 ```
 
-## Current workspace modules
+## Static data and deployment
 
-- **Daily brief:** snapshot freshness, priority hunt queries, recent KEV entries, and Markdown/print exports.
-- **Intel leads:** a small curated set of recent security research headlines, with CVE/KEV/EPSS and ATT&CK references linked to the hunt workspaces.
-- **Hypotheses:** typo-tolerant search, technique/severity/status filters, KQL/SPL/Elastic/Sigma tabs, and local hunt status.
-- **Coverage:** ATT&CK technique coverage derived from hunt and deployed-rule status, with Navigator layer import/export.
-- **IOC triage:** local extraction and snapshot lookups, with CSV and STIX 2.1 export.
-- **Rules:** searchable Sigma metadata with local deployment tracking.
-- **Journal:** private local hunt logs, evidence, drafts, filters, and Markdown export.
+The client uses only static JSON from `public/data/`; it makes no runtime intelligence-feed API calls. Report-to-hypothesis relationships are derived in the browser from exact ATT&CK technique IDs in the snapshots; no backend or user tracking is involved. The **Build Data** GitHub Actions workflow runs daily at 00:00 UTC or can be started manually. It fetches KEV, EPSS, ATT&CK, IOC, Sigma, and the [OffSec Radar RSS feed](https://radar.offseq.com/rss.xml), generates hunt templates and the manifest, validates the snapshots, and publishes the static site. If an optional feed is unavailable, the workflow reports it and retains last-good data where available.
 
-Every page surfaces missing or stale snapshot data rather than labeling unindexed indicators as safe. Feed inventory and terms are in [docs/ATTRIBUTION.md](./docs/ATTRIBUTION.md).
+Changes pushed to `main` run CI and the GitHub Pages deployment workflow. Configure Pages to use **GitHub Actions** as its source.
 
-## Data pipeline and deployment
+## Privacy and licensing
 
-The client reads only static JSON from `public/data/`. The **Build Data** GitHub Actions workflow runs daily at 00:00 UTC or can be started manually. It fetches KEV, EPSS, ATT&CK, IOC, Sigma, and curated RSS headline snapshots, builds deterministic analyst-authored hypothesis templates and the manifest, validates the snapshots and size budget, then deploys the resulting static site. Failed optional IOC, rule, and news sources retain their last-good records and are reported in the manifest.
+The service worker caches the application shell and public data for offline use. Theme preference is stored in this browser only. Triage input is not persisted or sent to HuntDeck. Feed and detection data have their own attribution and reuse terms; check [docs/ATTRIBUTION.md](./docs/ATTRIBUTION.md) before redistribution or commercial use.
 
-Changes pushed to `main` run CI and the GitHub Pages deployment workflow. Pages must use **GitHub Actions** as its source.
+HuntDeck's own code is licensed under [Apache-2.0](./LICENSE). This does not relicense third-party snapshots, feeds, or detection content.
 
-## Privacy and offline use
+## Inspiration
 
-The service worker caches the app shell and static snapshots for offline use. News snapshots store headlines and links rather than article bodies. Triage input, journal evidence, and analyst state are not sent to any service. Clearing this site's browser storage deletes local analyst data; export journal notes to Markdown for a backup.
-
-## Important limitations
-
-Hunt queries are deterministic authored templates, not AI-generated. Validate table names and fields against your own telemetry before running them. The pipeline currently indexes Sigma metadata and a limited set of IOC sources; see the attribution page and manifest warnings for source availability.
+- [OffSec Radar](https://radar.offseq.com/) — threat context and the RSS feed used by HuntDeck.
+- [ThreatFeed](https://github.com/jozeta/ThreatFeed) — client-side intelligence briefing concept.
+- [KQL threat-hunting queries](https://github.com/cyb3rmik3/KQL-threat-hunting-queries) — query-library direction.
+- [IntelOwl](https://github.com/intelowlproject/IntelOwl) — public threat-intelligence workflow ideas.

@@ -15,7 +15,7 @@ test('parses RSS headlines and extracts hunt-relevant CVEs, techniques, and topi
       <link>https://research.example.test/story</link>
       <pubDate>Sat, 31 Oct 2026 12:00:00 GMT</pubDate>
       <category>Vulnerability</category>
-      <description>This full article body must not be stored.</description>
+      <description>Unauthenticated exploitation documented in cloud gateway; CVSS: 9.8.</description>
     </item></channel></rss>`, source)
 
   assert.equal(articles.length, 1)
@@ -24,7 +24,38 @@ test('parses RSS headlines and extracts hunt-relevant CVEs, techniques, and topi
   assert.deepEqual(articles[0]?.techniques, ['T1059.001'])
   assert.deepEqual(articles[0]?.topics, ['Exploitation', 'Vulnerability', 'Cloud and identity'])
   assert.equal(articles[0]?.published_at, '2026-10-31T12:00:00.000Z')
-  assert.equal(JSON.stringify(articles).includes('full article body'), false)
+  assert.equal(articles[0]?.severity, 'unknown')
+  assert.equal(articles[0]?.cvss, 9.8)
+  assert.match(articles[0]?.summary ?? '', /Unauthenticated exploitation/)
+})
+
+test('parses OffSec Radar severity, vendor tags, CVEs, CVSS, and a safe summary', () => {
+  const articles = parseNewsFeed(`<rss><channel><item>
+    <title>CVE-2026-120135 in Apache Thrift</title>
+    <link>https://radar.offseq.com/threat/example</link>
+    <description><![CDATA[Remote code execution in Apache Thrift. <script>alert(1)</script> (CVSS: 8.2)]]></description>
+    <pubDate>Sat, 31 Oct 2026 20:33:00 GMT</pubDate>
+    <category>high</category><category>Apache Software Foundation</category>
+  </item></channel></rss>`, source)
+
+  assert.equal(articles[0]?.severity, 'high')
+  assert.equal(articles[0]?.cvss, 8.2)
+  assert.deepEqual(articles[0]?.cves, ['CVE-2026-120135'])
+  assert.deepEqual(articles[0]?.tags, ['high', 'Apache Software Foundation'])
+  assert.equal(articles[0]?.summary.includes('script'), false)
+})
+
+test('maps Radar severity categories and omits invalid CVSS scores', () => {
+  const articles = parseNewsFeed(`<rss><channel><item>
+    <title>Critical Apache vulnerability</title>
+    <link>https://radar.offseq.com/threat/critical</link>
+    <description>Arbitrary code execution.</description>
+    <category>critical</category>
+    <category>Apache</category>
+  </item></channel></rss>`, source)
+
+  assert.equal(articles[0]?.severity, 'critical')
+  assert.equal(articles[0]?.cvss, undefined)
 })
 
 test('supports Atom links and rejects unsafe article URLs and entity declarations', () => {

@@ -1,30 +1,14 @@
 import MiniSearch from 'minisearch'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useRules } from '../../data/snapshots'
-import type { DetectionRule, RuleDeploymentState } from '../../types'
-import { getRuleStates, saveRuleState } from '../../storage/user-store'
-
-const deploymentStatuses: RuleDeploymentState['status'][] = ['not_deployed', 'deployed', 'na']
 
 export default function Rules() {
   const query = useRules()
   const rules = query.data ?? []
   const [search, setSearch] = useState('')
   const [language, setLanguage] = useState('')
-  const [states, setStates] = useState<Record<string, RuleDeploymentState>>({})
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
-
-  useEffect(() => {
-    let active = true
-    getRuleStates().then(items => {
-      if (active) setStates(Object.fromEntries(items.map(item => [item.id, item])))
-    }).catch(reason => {
-      if (active) setError(reason instanceof Error ? reason.message : 'Could not load local rule state')
-    })
-    return () => { active = false }
-  }, [])
 
   const index = useMemo(() => {
     const miniSearch = new MiniSearch({
@@ -41,18 +25,6 @@ export default function Rules() {
     const ids = search.trim() ? new Set(index.search(search).map(result => String(result.id))) : undefined
     return rules.filter(rule => (!ids || ids.has(rule.id)) && (!language || rule.language === language))
   }, [rules, index, search, language])
-
-  async function setDeployment(rule: DetectionRule, status: RuleDeploymentState['status']) {
-    const next = { id: rule.id, status, updated_at: new Date().toISOString() }
-    try {
-      await saveRuleState(next)
-      setStates(previous => ({ ...previous, [rule.id]: next }))
-      setError('')
-      setNotice(`Saved deployment status for “${rule.title}” on this device.`)
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not save local rule state')
-    }
-  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -80,7 +52,6 @@ export default function Rules() {
         </label>
       </section>
 
-      {notice && <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900" role="status">{notice}</p>}
       {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-900" role="alert">{error}</p>}
       {query.isError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-900" role="alert">{query.error.message}</p>}
       <p className="text-sm text-slate-500">{query.isLoading ? 'Loading detection index…' : `${filtered.length} rules`}</p>
@@ -116,19 +87,8 @@ export default function Rules() {
                   </pre>
                 </div>
               )}
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-                <a className="text-sm font-semibold text-sky-800 underline" href={rule.url}
-                  target="_blank" rel="noreferrer">Open source rule</a>
-                <label className="flex items-center gap-2 text-xs text-slate-600">
-                  Deployment status
-                  <select className="field-input min-h-9 w-auto" value={states[rule.id]?.status ?? 'not_deployed'}
-                    onChange={event => void setDeployment(rule, event.target.value as RuleDeploymentState['status'])}>
-                    {deploymentStatuses.map(status => (
-                      <option key={status} value={status}>{status.replace('_', ' ')}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
+              <a className="mt-4 inline-block border-t border-slate-100 pt-4 text-sm font-semibold text-sky-800 underline"
+                href={rule.url} target="_blank" rel="noreferrer">Open source rule</a>
             </article>
           ))}
         </section>

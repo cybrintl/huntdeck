@@ -2,6 +2,7 @@
   "name": "huntdeck",
   "private": true,
   "version": "0.1.0",
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,7 +17,6 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.80.7",
-    "idb": "^8.0.0",
     "lucide-react": "^0.513.0",
     "minisearch": "^7.1.1",
     "react": "^19.3.1",

@@ -72,6 +72,8 @@ for (const [index, item] of news.items.entries()) {
     item === null ||
     !('title' in item) ||
     typeof item.title !== 'string' ||
+    !('summary' in item) ||
+    typeof item.summary !== 'string' ||
     !('url' in item) ||
     typeof item.url !== 'string' ||
     !item.url.startsWith('https://') ||
@@ -82,7 +84,11 @@ for (const [index, item] of news.items.entries()) {
     !('techniques' in item) ||
     !Array.isArray(item.techniques) ||
     !('topics' in item) ||
-    !Array.isArray(item.topics)
+    !Array.isArray(item.topics) ||
+    !('tags' in item) ||
+    !Array.isArray(item.tags) ||
+    !('severity' in item) ||
+    !['critical', 'high', 'medium', 'low', 'unknown'].includes(String(item.severity))
   ) {
     throw new Error(`news.json item ${index} has an invalid shape`)
   }
