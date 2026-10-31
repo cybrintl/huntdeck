@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useIocs, useKev, useManifest } from '../../data/snapshots'
 import type { DataSourceStatus, IOCRecord } from '../../types'
-import { classifyIndicators, extractIndicators, toCsv, toStixBundle } from '../../utils/indicators'
+import { classifyIndicators, extractIndicators, maskIndicator, toCsv, toStixBundle } from '../../utils/indicators'
 
 const sample = `2026-10-31T12:00:00Z denied connection from 198.51.100.23 to suspicious.example
 Alert: CVE-2026-12345 observed on host 10.1.2.3
@@ -16,7 +16,7 @@ function snapshotCsv(records: IOCRecord[], sourceUrls: Map<string, string>): str
   return [
     'value,type,category,sources,source_urls,source_weight,malware_family',
     ...records.map(record => [
-      record.value,
+      maskIndicator(record.value, record.type),
       record.type,
       record.category,
       record.sources.join('; '),
@@ -35,7 +35,6 @@ export default function Triage() {
   const [categoryFilter, setCategoryFilter] = useState('')
   const [sourceFilter, setSourceFilter] = useState('')
   const [displayLimit, setDisplayLimit] = useState(100)
-  const [copyMessage, setCopyMessage] = useState('')
   const iocs = useIocs()
   const kev = useKev()
   const manifest = useManifest()
@@ -103,15 +102,6 @@ export default function Triage() {
     )
   }
 
-  async function copyIndicator(value: string) {
-    try {
-      await navigator.clipboard.writeText(value)
-      setCopyMessage('Indicator copied')
-    } catch (error) {
-      setCopyMessage(error instanceof Error ? `Copy failed: ${error.message}` : 'Copy failed')
-    }
-  }
-
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -127,7 +117,8 @@ export default function Triage() {
 
       <aside className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
         Pasted text is processed in this browser and is never uploaded. Indicator matches are leads, not verdicts:
-        verify context and source before acting. “Not in snapshot” does not mean safe.
+        verify context and source before acting. “Not in snapshot” does not mean safe. Indicators are masked in
+        results and CSV exports; STIX export contains the original values and requires confirmation.
       </aside>
 
       <section aria-labelledby="ioc-snapshot-heading" className="space-y-4">
@@ -236,8 +227,7 @@ export default function Triage() {
               {filteredIocs.slice(0, displayLimit).map(record => (
                 <tr className="border-t border-slate-100" key={`${record.type}:${record.value}`}>
                   <td className="break-all px-4 py-3 font-mono text-xs">
-                    <button className="text-left hover:text-sky-800 hover:underline"
-                      onClick={() => void copyIndicator(record.value)}>{record.value}</button>
+                    {maskIndicator(record.value, record.type)}
                   </td>
                   <td className="px-4 py-3">
                     <span className="badge">{record.type.toUpperCase()}</span>
@@ -338,7 +328,11 @@ export default function Triage() {
                   download('huntdeck-triage.csv', toCsv(results), 'text/csv;charset=utf-8')}>
                   Export CSV
                 </button>
-                <button className="button-primary" onClick={exportStix}>Export STIX 2.1</button>
+                <button className="button-primary" onClick={() => {
+                  if (window.confirm(
+                    'STIX export contains the original, unmasked indicator values. Only continue if you intend to export these clear IOCs.'
+                  )) exportStix()
+                }}>Export raw STIX 2.1…</button>
               </div>
             )}
           </div>
@@ -356,7 +350,9 @@ export default function Triage() {
                 <tbody>
                   {results.map(result => (
                     <tr className="border-t border-slate-100" key={`${result.type}:${result.value}`}>
-                      <td className="break-all px-4 py-3 font-mono text-xs">{result.value}</td>
+                      <td className="break-all px-4 py-3 font-mono text-xs">
+                        {maskIndicator(result.value, result.type)}
+                      </td>
                       <td className="px-4 py-3 uppercase">{result.type}</td>
                       <td className="px-4 py-3">
                         <span className={result.verdict === 'Not in snapshot' ? 'badge-muted' : 'badge-warning'}>
@@ -380,7 +376,6 @@ export default function Triage() {
       {manifest.isError && <p className="text-xs text-red-800" role="alert">
         Could not load source freshness metadata: {manifest.error.message}
       </p>}
-      {copyMessage && <p className="sr-only" role="status">{copyMessage}</p>}
     </div>
   )
 }

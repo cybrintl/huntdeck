@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { performance } from 'node:perf_hooks'
 import test from 'node:test'
 import type { KevSnapshot } from '../types'
-import { classifyIndicators, extractIndicators, toCsv, toStixBundle } from './indicators'
+import { classifyIndicators, extractIndicators, maskIndicator, toCsv, toStixBundle } from './indicators'
 
 test('extracts unique public indicators and excludes private IPv4 addresses', () => {
   const found = extractIndicators([
@@ -72,4 +72,25 @@ test('exports CSV-escaped values and a STIX 2.1 bundle', () => {
   assert.ok(stix.objects.some(object => object.type === 'indicator'))
   assert.ok(stix.objects.some(object => object.type === 'note'))
   assert.ok(stix.objects.every(object => object.spec_version === '2.1'))
+})
+
+test('masks IOC values for display and CSV while preserving non-IOC references', () => {
+  assert.equal(maskIndicator('8.8.8.8', 'ip'), '8[.]8[.]8[.]8')
+  assert.equal(maskIndicator('suspicious.example', 'domain'), 'suspicious[.]example')
+  assert.equal(maskIndicator('https://suspicious.example/a', 'url'), 'hxxps://suspicious[.]example/a')
+  assert.equal(
+    maskIndicator('a'.repeat(64), 'sha256'),
+    `${'a'.repeat(8)}...${'a'.repeat(4)}`
+  )
+  assert.equal(maskIndicator('CVE-2026-12345', 'cve'), 'CVE-2026-12345')
+  assert.equal(maskIndicator('T1059.001', 'attack'), 'T1059.001')
+
+  const indicators = classifyIndicators(
+    [{ type: 'ip', value: '8.8.8.8' }],
+    [],
+    undefined,
+  )
+  const csv = toCsv(indicators)
+  assert.match(csv, /8\[\.\]8\[\.\]8\[\.\]8/)
+  assert.doesNotMatch(csv, /8\.8\.8\.8/)
 })

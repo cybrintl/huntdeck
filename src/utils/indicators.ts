@@ -9,6 +9,22 @@ export interface ExtractedIndicator {
   source_weight?: number
 }
 
+export function maskIndicator(value: string, type: IOCType): string {
+  if (type === 'ip' || type === 'domain') {
+    return value.replace(/\./g, '[.]')
+  }
+  if (type === 'url') {
+    return value
+      .replace(/^https?/i, protocol => protocol.toLowerCase() === 'https' ? 'hxxps' : 'hxxp')
+      .replace(/\./g, '[.]')
+  }
+  if (type === 'md5' || type === 'sha1' || type === 'sha256') {
+    if (value.length <= 16) return '[masked hash]'
+    return `${value.slice(0, 8)}...${value.slice(-4)}`
+  }
+  return value
+}
+
 const patterns: { type: IOCType; regex: RegExp }[] = [
   { type: 'url', regex: /\bhttps?:\/\/[^\s"'<>()[\]{}]+/gi },
   { type: 'sha256', regex: /\b[a-f\d]{64}\b/gi },
@@ -92,7 +108,7 @@ export function toCsv(indicators: ExtractedIndicator[]): string {
   return [
     'value,type,verdict,sources,malware_family,source_weight',
     ...indicators.map(indicator => [
-      indicator.value,
+      maskIndicator(indicator.value, indicator.type),
       indicator.type,
       indicator.verdict,
       indicator.sources.join('; '),
