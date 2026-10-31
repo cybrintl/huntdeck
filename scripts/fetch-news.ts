@@ -23,12 +23,41 @@ const sources: NewsSource[] = [
     name: 'OffSec Radar',
     url: 'https://radar.offseq.com/rss.xml',
   },
+  {
+    id: 'sans-isc',
+    name: 'SANS Internet Storm Center',
+    url: 'https://isc.sans.edu/rssfeed.xml',
+  },
+  {
+    id: 'cisco-talos',
+    name: 'Cisco Talos',
+    url: 'https://blog.talosintelligence.com/rss/',
+  },
+  {
+    id: 'microsoft-security',
+    name: 'Microsoft Security Blog',
+    url: 'https://www.microsoft.com/en-us/security/blog/feed/',
+  },
+  {
+    id: 'unit42',
+    name: 'Palo Alto Networks Unit 42',
+    url: 'https://unit42.paloaltonetworks.com/feed/',
+  },
+  {
+    id: 'securelist',
+    name: 'Kaspersky Securelist',
+    url: 'https://securelist.com/feed/',
+  },
 ]
 
 const snapshotPath = 'public/data/news.json'
 const maximumFeedBytes = 2_000_000
 const maximumAge = 30 * 24 * 60 * 60 * 1000
-const maximumItems = 200
+const maximumItems = 500
+
+function articleSignature(article: NewsArticle): string {
+  return `${article.title.toLocaleLowerCase().replace(/\s+/g, ' ').trim()}|${article.cves.join(',')}`
+}
 
 async function readPrevious(): Promise<NewsSnapshot> {
   try {
@@ -71,6 +100,7 @@ const previous = await readPrevious()
 const items = new Map<string, NewsArticle>()
 const sourceStatuses: NewsSourceStatus[] = []
 const warnings: string[] = []
+const seenSignatures = new Set<string>()
 const now = Date.now()
 const cutoff = now - maximumAge
 
@@ -79,26 +109,32 @@ for (const source of sources) {
     const articles = parseNewsFeed(await fetchFeed(source), source)
       .filter(article => !article.published_at || Date.parse(article.published_at) >= cutoff)
       .sort((a, b) => (b.published_at ?? '').localeCompare(a.published_at ?? ''))
-    const seen = new Set<string>()
+    let count = 0
     for (const article of articles) {
-      const signature = `${article.title.toLocaleLowerCase().replace(/\s+/g, ' ').trim()}|${article.cves.join(',')}`
-      if (seen.has(signature)) continue
-      seen.add(signature)
+      const signature = articleSignature(article)
+      if (seenSignatures.has(signature)) continue
+      seenSignatures.add(signature)
       items.set(article.url, article)
-      if (seen.size >= maximumItems) break
+      count += 1
+      if (count >= maximumItems) break
     }
     sourceStatuses.push({
       ...source,
       fetched_at: new Date().toISOString(),
       status: 'ok',
-      count: seen.size,
+      count,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.warn(`News source unavailable; retaining last-good headlines: ${message}`)
     warnings.push(message)
     const priorItems = previous.items.filter(item => item.source === source.id)
-    for (const article of priorItems) items.set(article.url, article)
+    for (const article of priorItems) {
+      const signature = articleSignature(article)
+      if (seenSignatures.has(signature)) continue
+      seenSignatures.add(signature)
+      items.set(article.url, article)
+    }
     sourceStatuses.push({
       ...source,
       fetched_at: new Date().toISOString(),

@@ -11,9 +11,9 @@ HuntDeck takes product inspiration from [OffSec Radar](https://radar.offseq.com/
 - **Daily brief:** current snapshot counts and freshness, high-priority hunt ideas, KEV/EPSS context, and recent threat-report leads.
 - **Hunt library:** searchable hypotheses with ATT&CK mappings, telemetry guidance, investigation pivots, validation caveats, false-positive considerations, and KQL/SPL/Elastic/Sigma examples. Export the currently filtered hunts as a portable Markdown hunt pack.
 - **Technique map:** ATT&CK techniques linked to indexed hypotheses and detection rules. This is a content index, not a claim about any organization's deployed coverage.
-- **IOC triage:** extract and compare indicators in the browser with published IOC/KEV snapshots; export results as CSV or STIX 2.1.
-- **Detection rules:** search Sigma metadata, ATT&CK references, and available query examples.
-- **Intel leads:** recent OffSec Radar threat reports with short summaries, severity/CVSS, CVEs, and links to the source. Extracted ATT&CK references link directly to matching hypotheses when available.
+- **IOC intelligence and triage:** browse and filter the published multi-feed IOC snapshot, export a filtered CSV, or extract and compare indicators from local text; export matches as CSV or STIX 2.1.
+- **Detection rules and hunt queries:** search native KQL, Splunk SPL, Elastic KQL, and Sigma content. Filter by platform, source, ATT&CK technique, severity, and telemetry.
+- **Intel leads:** research headlines from OffSec Radar, SANS Internet Storm Center, Cisco Talos, Microsoft Security, Palo Alto Networks Unit 42, and Kaspersky Securelist, with source status, summaries, severity/CVSS, CVEs, and links. Extracted ATT&CK references link to matching hypotheses when available.
 - **Themes:** Light, Dark, Ocean, and Forest, with the selected appearance stored only in local browser preferences.
 
 Data is informational and may be incomplete. Verify source reports, validate query fields against your own telemetry, and do not treat an IOC absent from a snapshot as safe.
@@ -36,7 +36,9 @@ npm run build
 
 ## Static data and deployment
 
-The client uses only static JSON from `public/data/`; it makes no runtime intelligence-feed API calls. Report-to-hypothesis relationships are derived in the browser from exact ATT&CK technique IDs in the snapshots; no backend or user tracking is involved. The **Build Data** GitHub Actions workflow runs daily at 00:00 UTC or can be started manually. It fetches KEV, EPSS, ATT&CK, IOC, Sigma, and the [OffSec Radar RSS feed](https://radar.offseq.com/rss.xml), generates hunt templates and the manifest, validates the snapshots, and publishes the static site. If an optional feed is unavailable, the workflow reports it and retains last-good data where available.
+The client uses only static JSON from `public/data/`; it makes no runtime intelligence-feed API calls. Report-to-hypothesis relationships are derived in the browser from exact ATT&CK technique IDs in the snapshots; no backend or user tracking is involved. The **Build Data** GitHub Actions workflow runs daily at 00:00 UTC or can be started manually. It fetches KEV, EPSS, ATT&CK, IOC feeds, Sigma rules, Microsoft Sentinel hunting queries, Splunk Security Content, and the RSS sources above; generates hunt templates and the manifest; validates the snapshots; and publishes the static site. Feed statuses and warnings are visible in the relevant workspaces. If a source is unavailable, the workflow retains last-good data where available.
+
+Feed breadth is curated rather than unlimited: some intelligence APIs require keys or accounts, and bulk blocklists can be stale, noisy, or restricted by their terms. HuntDeck does not query vendor APIs from the visitor's browser.
 
 Changes pushed to `main` run CI and the GitHub Pages deployment workflow. Configure Pages to use **GitHub Actions** as its source.
 

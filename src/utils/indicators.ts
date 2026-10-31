@@ -6,7 +6,7 @@ export interface ExtractedIndicator {
   verdict: string
   sources: string[]
   malware_family?: string
-  confidence?: number
+  source_weight?: number
 }
 
 const patterns: { type: IOCType; regex: RegExp }[] = [
@@ -77,7 +77,7 @@ export function classifyIndicators(
         verdict: record.category,
         sources: record.sources,
         malware_family: record.malware_family,
-        confidence: record.confidence,
+        source_weight: record.source_weight,
       }
     }
     if (indicator.type === 'attack') {
@@ -90,14 +90,14 @@ export function classifyIndicators(
 export function toCsv(indicators: ExtractedIndicator[]): string {
   const escape = (value: string) => `"${value.replace(/"/g, '""')}"`
   return [
-    'value,type,verdict,sources,malware_family,confidence',
+    'value,type,verdict,sources,malware_family,source_weight',
     ...indicators.map(indicator => [
       indicator.value,
       indicator.type,
       indicator.verdict,
       indicator.sources.join('; '),
       indicator.malware_family ?? '',
-      indicator.confidence?.toString() ?? '',
+      indicator.source_weight?.toString() ?? '',
     ].map(escape).join(',')),
   ].join('\r\n')
 }

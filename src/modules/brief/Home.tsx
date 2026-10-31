@@ -3,12 +3,9 @@ import { Link } from 'react-router-dom'
 import {
   useEpss,
   useHypotheses,
-  useIocs,
   useKev,
   useManifest,
   useNews,
-  useRules,
-  useTechniques,
 } from '../../data/snapshots'
 import type { EpssEntry, HuntHypothesis, KevEntry, NewsArticle } from '../../types'
 
@@ -64,9 +61,6 @@ export default function Home() {
   const kev = useKev()
   const epss = useEpss()
   const hypothesesQuery = useHypotheses()
-  const iocs = useIocs()
-  const rules = useRules()
-  const techniques = useTechniques()
   const news = useNews()
   const [copyMessage, setCopyMessage] = useState('')
   const hypotheses = useMemo(
@@ -152,10 +146,10 @@ export default function Home() {
       </section>
 
       {(manifest.isError || kev.isError || epss.isError || hypothesesQuery.isError ||
-        iocs.isError || rules.isError || techniques.isError || news.isError) && (
+        news.isError) && (
         <section className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900" role="alert">
           Some snapshot data could not be loaded:{' '}
-          {[manifest, kev, epss, hypothesesQuery, iocs, rules, techniques, news]
+          {[manifest, kev, epss, hypothesesQuery, news]
             .filter(query => query.isError)
             .map(query => query.error.message)
             .join(' ')}
@@ -265,38 +259,25 @@ export default function Home() {
       <section aria-label="Other intelligence feeds" className="grid gap-4 lg:grid-cols-2">
         <FeedStatusCard
           title="ATT&CK techniques indexed"
-          count={techniques.data?.length}
-          detail={techniques.data?.some(technique => technique.trending_score !== undefined)
-            ? 'Technique trend scores are included in this snapshot.'
-            : `${hypotheses.length} deterministic hunts are linked to the ATT&CK technique catalog.`}
+          count={manifest.data?.counts?.techniques}
+          detail={`${manifest.data?.counts?.hypotheses ?? hypotheses.length} deterministic hunt hypotheses are linked to the ATT&CK technique catalog.`}
           to="/coverage"
           linkLabel="Open coverage workspace"
         />
         <FeedStatusCard
           title="Indicators indexed"
-          count={iocs.data?.length}
-          detail={iocs.data?.length
-            ? 'Indicators are checked against the local snapshot; “not in snapshot” is not a clean verdict.'
+          count={manifest.data?.counts?.iocs}
+          detail={(manifest.data?.counts?.iocs ?? 0) > 0
+            ? 'A public indicator corpus is available to browse or compare against pasted telemetry in browser-only IOC triage.'
             : 'No indicators are available in the current snapshot.'}
           to="/triage"
-          linkLabel="Open IOC triage"
-        >
-          {iocs.data && iocs.data.length > 0 && (
-            <ul className="mt-3 space-y-1">
-              {iocs.data.slice(0, 3).map(ioc => (
-                <li className="truncate font-mono text-xs text-slate-700" key={`${ioc.type}:${ioc.value}`}>
-                  <span className="mr-2 font-sans font-semibold uppercase text-slate-500">{ioc.category}</span>
-                  {ioc.value}
-                </li>
-              ))}
-            </ul>
-          )}
-        </FeedStatusCard>
+          linkLabel="Browse IOC sources and triage"
+        />
         <FeedStatusCard
           title="Detection rules indexed"
-          count={rules.data?.length}
-          detail={rules.data?.length
-            ? 'Sigma metadata and upstream source links are available.'
+          count={manifest.data?.counts?.rules}
+          detail={(manifest.data?.counts?.rules ?? 0) > 0
+            ? 'KQL, SPL, and Sigma content from public sources and HuntDeck-authored hypotheses is available.'
             : 'The rule index has not been generated yet.'}
           to="/rules"
           linkLabel="Search rules"

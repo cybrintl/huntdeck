@@ -214,6 +214,63 @@ const templates: HuntTemplate[] = [
     elastic: 'process.name:"cmd.exe" and process.command_line:(*whoami* or *nltest* or *certutil* or *bitsadmin*)',
     sigma: 'title: Suspicious Windows command shell arguments\ndetection:\n  selection_image:\n    Image|endswith: \\\\cmd.exe\n  selection_args:\n    CommandLine|contains:\n      - whoami\n      - nltest\n      - certutil\n      - bitsadmin\n  condition: selection_image and selection_args\nlogsource:\n  product: windows\n  category: process_creation',
   },
+  {
+    technique: 'T1110.001',
+    title: 'SSH password guessing across Linux accounts',
+    severity: 'high',
+    hypothesis: 'One source address generates failed SSH authentications for multiple accounts within a short period.',
+    logSources: ['Linux authentication logs (auth/authpriv)', 'SSH daemon logs', 'Identity-provider sign-in logs'],
+    investigationSteps: [
+      'Review the source address, targeted account names, failure reasons, and whether a successful authentication followed the failures.',
+      'Pivot from any successful login to the destination host, session activity, privilege changes, and subsequent network connections.',
+      'Compare the source with approved scanners, VPN egress, bastions, and expected internet-facing service exposure.',
+    ],
+    validationNotes: 'The KQL example parses common sshd message text and IPv4/IPv6-like source tokens; verify your Syslog facility, message format, and time-window threshold.',
+    falsePositiveNotes: 'Internet background scanning, vulnerability assessments, misconfigured automation, shared NAT, and password rotation can create repeated failures.',
+    tags: ['linux', 'ssh', 'authentication', 'brute-force'],
+    kql: 'Syslog\n| where Facility in~ ("auth", "authpriv")\n| where SyslogMessage contains "Failed password"\n| extend SourceIp=extract(@"from ([0-9a-fA-F:.]+)", 1, SyslogMessage), TargetUser=extract(@"Failed password for (?:invalid user )?(\\S+)", 1, SyslogMessage)\n| where isnotempty(SourceIp) and isnotempty(TargetUser)\n| summarize failures=count(), targeted_accounts=dcount(TargetUser) by SourceIp, bin(TimeGenerated, 10m)\n| where targeted_accounts >= 5',
+    spl: 'index=linux (sourcetype=secure OR sourcetype=auth) "Failed password"\n| rex "Failed password for (?:invalid user )?(?<target_user>\\\\S+) from (?<source_ip>\\\\S+)"\n| bin _time span=10m\n| stats count as failures dc(target_user) as targeted_accounts by source_ip _time\n| where targeted_accounts >= 5',
+    elastic: 'event.category:authentication and event.outcome:failure and process.name:sshd and source.ip:*',
+    sigma: 'title: Repeated SSH authentication failures\nlogsource:\n  product: linux\n  service: sshd\ndetection:\n  selection:\n    message|contains: Failed password\n  condition: selection',
+  },
+  {
+    technique: 'T1098.004',
+    title: 'Unexpected SSH authorized-keys change',
+    severity: 'high',
+    hypothesis: 'An SSH authorized_keys file is created or modified outside a known account-management or configuration-management change.',
+    logSources: ['Linux endpoint file events', 'Linux auditd file activity', 'EDR file telemetry'],
+    investigationSteps: [
+      'Identify the affected host and account from the file path, then review the modifying process, user, parent process, and change time.',
+      'Compare the new key fingerprint and associated account with approved access records; do not treat the public key itself as proof of misuse.',
+      'Pivot to nearby SSH logins, privilege changes, source hosts, and other persistence changes on the affected system.',
+    ],
+    validationNotes: 'Confirm that endpoint or audit telemetry records file creation and modification for home-directory .ssh paths. Paths and event names vary by agent and operating system.',
+    falsePositiveNotes: 'User onboarding, key rotation, configuration-management tools, automated deployment, and administrator access maintenance commonly update authorized_keys.',
+    tags: ['linux', 'ssh', 'persistence', 'account-manipulation'],
+    kql: 'DeviceFileEvents\n| where FileName =~ "authorized_keys"\n| where FolderPath contains "/.ssh/"\n| where ActionType in~ ("FileCreated", "FileModified")\n| project Timestamp, DeviceName, FolderPath, FileName, ActionType, InitiatingProcessFileName, InitiatingProcessCommandLine, InitiatingProcessAccountName',
+    spl: 'index=linux* ("authorized_keys" OR ".ssh")\n| eval key_file=coalesce(file.path, path, TargetFilename)\n| where like(key_file, "%/.ssh/authorized_keys")\n| stats count values(process) as modifying_processes values(user) as modifying_users by host key_file',
+    elastic: 'file.path:* and file.name:"authorized_keys" and event.type:(creation or change)',
+    sigma: 'title: SSH authorized_keys file modification\nlogsource:\n  product: linux\n  category: file_event\ndetection:\n  selection:\n    TargetFilename|endswith: /.ssh/authorized_keys\n  condition: selection',
+  },
+  {
+    technique: 'T1078.004',
+    title: 'Cloud account sign-in from multiple source addresses',
+    severity: 'medium',
+    hypothesis: 'A cloud identity completes successful sign-ins from several source addresses in a short interval that is unusual for that identity.',
+    logSources: ['Microsoft Entra ID SigninLogs', 'Cloud identity-provider authentication events'],
+    investigationSteps: [
+      'Review the account, source addresses, device identifiers, locations, authentication methods, MFA results, and conditional-access decisions.',
+      'Compare the addresses and sign-in pattern with the user’s role, known VPN or secure web gateway egress, and normal service-account behavior.',
+      'For unexplained successful sign-ins, pivot to application access, privilege changes, token activity, and endpoint sessions in the same time window.',
+    ],
+    validationNotes: 'The KQL example uses the Microsoft Sentinel SigninLogs schema. Normalize success values, user/IP fields, and location fields before adapting SPL or Elastic queries.',
+    falsePositiveNotes: 'Corporate VPNs, mobile networks, cloud proxies, travel, shared egress, and identity-provider address normalization can produce multiple legitimate source addresses.',
+    tags: ['cloud', 'identity', 'authentication', 'baseline'],
+    kql: 'SigninLogs\n| where ResultType == "0"\n| summarize source_addresses=dcount(IPAddress), countries=dcount(tostring(LocationDetails.countryOrRegion)) by UserPrincipalName, bin(TimeGenerated, 1h)\n| where source_addresses >= 3 or countries >= 2',
+    spl: 'index=azure:signin (ResultType=0 OR result=0)\n| eval account=coalesce(UserPrincipalName, user), source_ip=coalesce(IPAddress, src)\n| bin _time span=1h\n| stats dc(source_ip) as source_addresses count by account _time\n| where source_addresses >= 3',
+    elastic: 'event.dataset:azure.signinlogs and event.outcome:success and user.name:* and source.ip:*',
+    sigma: 'title: Successful cloud account sign-in\nlogsource:\n  product: azure\n  service: signinlogs\ndetection:\n  selection:\n    ResultType: "0"\n  condition: selection',
+  },
 ]
 
 const techniques: Technique[] = JSON.parse(await readFile('public/data/techniques.json', 'utf8'))
@@ -246,7 +303,7 @@ const hypotheses = templates.map(template => {
       },
     },
     tags: template.tags,
-    ...(technique ? { tactic: technique.tactics } : {}),
+    ...(technique ? { tactics: technique.tactics } : {}),
   }
 })
 

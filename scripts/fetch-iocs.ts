@@ -6,7 +6,7 @@ interface Source {
   url: string
   type: 'ip' | 'url'
   category: string
-  confidence: number
+  sourceWeight: number
   parse: (text: string) => string[]
 }
 
@@ -15,15 +15,23 @@ interface IOCRecord {
   type: 'ip' | 'url'
   category: string
   sources: string[]
-  confidence?: number
+  source_weight?: number
   last_seen?: string
 }
 
 interface SourceResult {
+  kind: 'ioc'
+  id: string
+  url: string
   source: string
   fetched_at: string
   status: 'ok' | 'stale'
   count: number
+}
+
+interface SourceStatusDocument {
+  sources: Record<string, SourceResult | { kind?: 'ioc' | 'detection'; [key: string]: unknown } | string>
+  warnings: string[]
 }
 
 const ipv4Pattern = /\b(?:\d{1,3}\.){3}\d{1,3}\b/
@@ -34,7 +42,7 @@ const sources: Source[] = [
     url: 'https://openphish.com/feed.txt',
     type: 'url',
     category: 'phishing',
-    confidence: 0.8,
+    sourceWeight: 0.8,
     parse: text => text.split(/\r?\n/).map(line => line.trim()).filter(line => /^https?:\/\//i.test(line)),
   },
   {
@@ -43,7 +51,7 @@ const sources: Source[] = [
     url: 'https://feeds.dshield.org/block.txt',
     type: 'ip',
     category: 'abuse',
-    confidence: 0.7,
+    sourceWeight: 0.7,
     parse: text => text.split(/\r?\n/).flatMap(line => {
       const match = line.match(ipv4Pattern)?.[0]
       return match ? [match] : []
@@ -55,7 +63,7 @@ const sources: Source[] = [
     url: 'https://cinsscore.com/list/ci-badguys.txt',
     type: 'ip',
     category: 'abuse',
-    confidence: 0.7,
+    sourceWeight: 0.7,
     parse: text => text.split(/\r?\n/).map(line => line.trim()).filter(line => ipv4Pattern.test(line)),
   },
   {
@@ -64,7 +72,7 @@ const sources: Source[] = [
     url: 'https://lists.blocklist.de/lists/all.txt',
     type: 'ip',
     category: 'abuse',
-    confidence: 0.7,
+    sourceWeight: 0.7,
     parse: text => text.split(/\r?\n/).map(line => line.trim()).filter(line => ipv4Pattern.test(line)),
   },
 ]
@@ -120,6 +128,61 @@ async function readPrevious(): Promise<IOCRecord[]> {
   }
 }
 
+function sourceIdForName(name: string): string {
+  const source = sources.find(item => item.name === name)
+  return source?.id ?? name.toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+
+async function readSourceStatus(): Promise<SourceStatusDocument> {
+  try {
+    const value: unknown = JSON.parse(await readFile('public/data/source-status.json', 'utf8'))
+    if (
+      typeof value !== 'object' ||
+      value === null ||
+      !('sources' in value) ||
+      !('warnings' in value) ||
+      !Array.isArray(value.warnings) ||
+      typeof value.sources !== 'object' ||
+      value.sources === null
+    ) {
+      throw new Error('Existing source status snapshot has an invalid format')
+    }
+
+    const normalizedSources: Record<string, SourceResult | string> = {}
+    if (Array.isArray(value.sources)) {
+      for (const entry of value.sources) {
+        if (typeof entry !== 'object' || entry === null || !('source' in entry) ||
+          typeof entry.source !== 'string' || !('fetched_at' in entry) ||
+          typeof entry.fetched_at !== 'string' || !('status' in entry) ||
+          (entry.status !== 'ok' && entry.status !== 'stale') || !('count' in entry) ||
+          typeof entry.count !== 'number') {
+          throw new Error('Existing source status snapshot contains an invalid entry')
+        }
+        normalizedSources[sourceIdForName(entry.source)] = {
+          kind: 'ioc',
+          id: sourceIdForName(entry.source),
+          url: '',
+          source: entry.source,
+          fetched_at: entry.fetched_at,
+          status: entry.status,
+          count: entry.count,
+        }
+      }
+    } else {
+      Object.assign(normalizedSources, value.sources)
+    }
+    return {
+      sources: normalizedSources,
+      warnings: value.warnings.filter(item => typeof item === 'string'),
+    }
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return { sources: {}, warnings: [] }
+    }
+    throw error
+  }
+}
+
 const previous = await readPrevious()
 const records = new Map<string, IOCRecord>()
 const statuses: SourceResult[] = []
@@ -139,14 +202,16 @@ for (const source of sources) {
         type: source.type,
         category: source.category,
         sources: [],
-        confidence: source.confidence,
-        last_seen: new Date().toISOString().slice(0, 10),
+        source_weight: source.sourceWeight,
       }
       if (!record.sources.includes(source.name)) record.sources.push(source.name)
-      record.confidence = Math.max(record.confidence ?? 0, source.confidence)
+      record.source_weight = Math.max(record.source_weight ?? 0, source.sourceWeight)
       records.set(key, record)
     }
     statuses.push({
+      kind: 'ioc',
+      id: source.id,
+      url: source.url,
       source: source.name,
       fetched_at: new Date().toISOString(),
       status: 'ok',
@@ -159,11 +224,15 @@ for (const source of sources) {
     const priorRecords = previous.filter(record => record.sources.includes(source.name))
     for (const record of priorRecords) {
       const key = `${record.type}:${record.value.toLowerCase()}`
-      const merged = records.get(key) ?? { ...record, sources: [...record.sources] }
+      const { last_seen: _lastSeen, ...retained } = record
+      const merged = records.get(key) ?? { ...retained, sources: [...record.sources] }
       if (!merged.sources.includes(source.name)) merged.sources.push(source.name)
       records.set(key, merged)
     }
     statuses.push({
+      kind: 'ioc',
+      id: source.id,
+      url: source.url,
       source: source.name,
       fetched_at: new Date().toISOString(),
       status: 'stale',
@@ -177,11 +246,17 @@ const snapshot = [...records.values()]
   .sort((a, b) =>
     (b.sources.length - a.sources.length) ||
     ((categoryOrder[a.category] ?? 9) - (categoryOrder[b.category] ?? 9)) ||
-    (b.confidence ?? 0) - (a.confidence ?? 0) ||
+    (b.source_weight ?? 0) - (a.source_weight ?? 0) ||
     a.value.localeCompare(b.value)
   )
   .slice(0, 30_000)
 await mkdir('public/data', { recursive: true })
 await writeFile('public/data/iocs.json', JSON.stringify(snapshot))
-await writeFile('public/data/source-status.json', JSON.stringify({ sources: statuses, warnings }, null, 2))
+const sourceStatus = await readSourceStatus()
+for (const status of statuses) sourceStatus.sources[status.id] = status
+sourceStatus.warnings = [
+  ...sourceStatus.warnings.filter(warning => !warning.startsWith('ioc:')),
+  ...warnings.map(warning => `ioc: ${warning}`),
+]
+await writeFile('public/data/source-status.json', JSON.stringify(sourceStatus, null, 2))
 console.log(`IOC snapshot saved (${snapshot.length} unique indicators)`)

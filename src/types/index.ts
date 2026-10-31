@@ -13,6 +13,7 @@ export interface HuntHypothesis {
   generated?: boolean
   needs_review?: boolean
   attack_techniques?: string[]
+  tactics?: string[]
   severity?: 'critical' | 'high' | 'medium' | 'low' | 'informational'
   date?: string
   why?: string
@@ -64,9 +65,18 @@ export interface DataManifest {
     rules?: number
     news?: number
   }
-  sources?: Record<string, string | { source?: string; fetched_at: string; status: string; count: number }>
+  sources?: Record<string, string | DataSourceStatus>
   warnings?: string[]
   ai?: { model?: string; golden_set_accuracy?: number | null; skipped?: boolean }
+}
+
+export interface DataSourceStatus {
+  kind?: 'ioc' | 'detection'
+  source?: string
+  url?: string
+  fetched_at: string
+  status: string
+  count: number
 }
 
 export type IOCType = 'ip' | 'domain' | 'url' | 'md5' | 'sha1' | 'sha256' | 'cve' | 'attack'
@@ -77,21 +87,29 @@ export interface IOCRecord {
   category: string
   sources: string[]
   malware_family?: string
-  confidence?: number
+  source_weight?: number
   first_seen?: string
   last_seen?: string
 }
 
 export interface DetectionRule {
   id: string
+  source_id?: string
+  source_name?: string
   title: string
+  description?: string
   attack_techniques: string[]
+  tactics?: string[]
   log_source?: string
+  data_sources?: string[]
   language: string
   license: string
   url: string
   query_text?: string
   severity?: string
+  known_false_positives?: string
+  updated_at?: string
+  internal_path?: string
 }
 
 export interface NewsArticle {
@@ -130,8 +148,24 @@ export interface AttackTechnique {
   name: string
   tactics: string[]
   data_sources?: string[]
+  description?: string
   detection?: string
+  detection_strategies?: AttackDetectionStrategy[]
   trending_score?: number
   cves?: string[]
   atomic_tests?: string[]
+}
+
+export interface AttackDetectionStrategy {
+  id: string
+  name: string
+  url: string
+  analytics: AttackAnalytic[]
+}
+
+export interface AttackAnalytic {
+  name: string
+  description: string
+  platforms: string[]
+  log_sources: string[]
 }

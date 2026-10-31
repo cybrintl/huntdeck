@@ -34,6 +34,7 @@ if (
   !('warnings' in sourceStatus) ||
   typeof sourceStatus.sources !== 'object' ||
   sourceStatus.sources === null ||
+  Array.isArray(sourceStatus.sources) ||
   !Array.isArray(sourceStatus.warnings)
 ) {
   throw new Error('Cannot build manifest: one or more snapshots have an invalid format')
@@ -60,7 +61,7 @@ const manifest = {
     news: {
       source: 'OffSec Radar RSS',
       fetched_at: news.built_at,
-      status: news.sources.every(source =>
+      status: news.sources.length > 0 && news.sources.every(source =>
         typeof source === 'object' &&
         source !== null &&
         'status' in source &&

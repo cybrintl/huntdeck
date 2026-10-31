@@ -1,29 +1,65 @@
 {
-  "sources": [
-    {
+  "sources": {
+    "openphish": {
+      "kind": "ioc",
+      "id": "openphish",
+      "url": "https://openphish.com/feed.txt",
       "source": "OpenPhish Community Feed",
-      "fetched_at": "2026-10-31T19:03:36.819Z",
+      "fetched_at": "2026-10-31T22:28:13.012Z",
       "status": "ok",
       "count": 300
     },
-    {
+    "dshield": {
+      "kind": "ioc",
+      "id": "dshield",
+      "url": "https://feeds.dshield.org/block.txt",
       "source": "DShield Recommended Block List",
-      "fetched_at": "2026-10-31T19:03:36.911Z",
+      "fetched_at": "2026-10-31T22:28:13.072Z",
       "status": "ok",
       "count": 20
     },
-    {
+    "cins": {
+      "kind": "ioc",
+      "id": "cins",
+      "url": "https://cinsscore.com/list/ci-badguys.txt",
       "source": "CINS Army",
-      "fetched_at": "2026-10-31T19:03:38.643Z",
+      "fetched_at": "2026-10-31T22:28:14.936Z",
       "status": "ok",
       "count": 15000
     },
-    {
+    "blocklist-de": {
+      "kind": "ioc",
+      "id": "blocklist-de",
+      "url": "https://lists.blocklist.de/lists/all.txt",
       "source": "blocklist.de",
-      "fetched_at": "2026-10-31T19:03:38.925Z",
+      "fetched_at": "2026-10-31T22:28:15.101Z",
       "status": "ok",
-      "count": 25470
+      "count": 25289
+    },
+    "sigma": {
+      "kind": "detection",
+      "source": "SigmaHQ",
+      "url": "https://github.com/SigmaHQ/sigma",
+      "fetched_at": "2026-10-31T22:28:21.893Z",
+      "status": "ok",
+      "count": 3161
+    },
+    "microsoft-sentinel": {
+      "kind": "detection",
+      "source": "Microsoft Sentinel Hunting Queries",
+      "url": "https://github.com/Azure/Azure-Sentinel",
+      "fetched_at": "2026-10-31T22:28:25.616Z",
+      "status": "ok",
+      "count": 496
+    },
+    "splunk-security-content": {
+      "kind": "detection",
+      "source": "Splunk Security Content",
+      "url": "https://github.com/splunk/security_content",
+      "fetched_at": "2026-10-31T22:28:31.212Z",
+      "status": "ok",
+      "count": 500
     }
-  ],
+  },
   "warnings": []
 }

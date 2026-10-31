@@ -27,8 +27,10 @@ export default function Intelligence() {
   const [search, setSearch] = useState('')
   const [sourceFilter, setSourceFilter] = useState('')
   const [topicFilter, setTopicFilter] = useState('')
+  const [techniqueFilter, setTechniqueFilter] = useState('')
   const [severityFilter, setSeverityFilter] = useState('')
   const [timeWindow, setTimeWindow] = useState('7')
+  const [kevOnly, setKevOnly] = useState(false)
   const items = news.data?.items ?? []
   const kevCves = useMemo(
     () => new Set((kev.data?.vulnerabilities ?? []).map(item => item.cveID)),
@@ -43,6 +45,10 @@ export default function Intelligence() {
     () => [...new Set(items.flatMap(item => item.topics))].sort(),
     [items]
   )
+  const techniques = useMemo(
+    () => [...new Set(items.flatMap(item => item.techniques))].sort(),
+    [items]
+  )
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase()
     const cutoff = Date.now() - Number(timeWindow) * 24 * 60 * 60 * 1000
@@ -53,10 +59,12 @@ export default function Intelligence() {
       return (!query || searchable.includes(query)) &&
         (!sourceFilter || item.source === sourceFilter) &&
         (!topicFilter || item.topics.includes(topicFilter)) &&
+        (!techniqueFilter || item.techniques.includes(techniqueFilter)) &&
         (!severityFilter || item.severity === severityFilter) &&
+        (!kevOnly || item.cves.some(cve => kevCves.has(cve))) &&
         withinWindow
     }).sort((a, b) => (b.published_at ?? '').localeCompare(a.published_at ?? ''))
-  }, [items, search, sourceFilter, topicFilter, severityFilter, timeWindow])
+  }, [items, search, sourceFilter, topicFilter, techniqueFilter, severityFilter, timeWindow, kevOnly, kevCves])
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -108,7 +116,7 @@ export default function Intelligence() {
         </p>
       )}
 
-      <section aria-label="Filter research headlines" className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-5">
+      <section aria-label="Filter research headlines" className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-6">
         <label className="lg:col-span-2">
           <span className="field-label">Search headlines, CVEs, and topics</span>
           <input className="field-input" type="search" value={search}
@@ -136,8 +144,16 @@ export default function Intelligence() {
             </option>)}
           </select>
         </label>
+        <label>
+          <span className="field-label">ATT&amp;CK technique</span>
+          <select className="field-input" value={techniqueFilter}
+            onChange={event => setTechniqueFilter(event.target.value)}>
+            <option value="">All techniques</option>
+            {techniques.map(technique => <option key={technique}>{technique}</option>)}
+          </select>
+        </label>
         {topics.length > 0 && (
-          <label className="sm:col-span-2 lg:col-span-5">
+          <label className="sm:col-span-2 lg:col-span-6">
             <span className="field-label">Topic</span>
             <select className="field-input" value={topicFilter} onChange={event => setTopicFilter(event.target.value)}>
               <option value="">All topics</option>
@@ -145,6 +161,10 @@ export default function Intelligence() {
             </select>
           </label>
         )}
+        <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2 lg:col-span-6">
+          <input type="checkbox" checked={kevOnly} onChange={event => setKevOnly(event.target.checked)} />
+          Only reports referencing a CISA Known Exploited Vulnerability
+        </label>
       </section>
 
       <div className="flex items-center justify-between gap-3">
