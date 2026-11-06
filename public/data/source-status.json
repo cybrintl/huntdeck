@@ -5,7 +5,7 @@
       "id": "openphish",
       "url": "https://openphish.com/feed.txt",
       "source": "OpenPhish Community Feed",
-      "fetched_at": "2026-11-06T00:41:55.269Z",
+      "fetched_at": "2026-11-06T21:28:24.847Z",
       "status": "ok",
       "count": 300,
       "published_count": 100
@@ -15,7 +15,7 @@
       "id": "dshield",
       "url": "https://feeds.dshield.org/block.txt",
       "source": "DShield Recommended Block List",
-      "fetched_at": "2026-11-06T00:41:55.472Z",
+      "fetched_at": "2026-11-06T21:28:25.064Z",
       "status": "ok",
       "count": 20,
       "published_count": 20
@@ -25,7 +25,7 @@
       "id": "cins",
       "url": "https://cinsscore.com/list/ci-badguys.txt",
       "source": "CINS Army",
-      "fetched_at": "2026-11-06T00:41:55.854Z",
+      "fetched_at": "2026-11-06T21:28:25.337Z",
       "status": "ok",
       "count": 15000,
       "published_count": 100
@@ -35,16 +35,16 @@
       "id": "blocklist-de",
       "url": "https://lists.blocklist.de/lists/all.txt",
       "source": "blocklist.de",
-      "fetched_at": "2026-11-06T00:41:56.158Z",
+      "fetched_at": "2026-11-06T21:28:25.586Z",
       "status": "ok",
-      "count": 26005,
+      "count": 26255,
       "published_count": 100
     },
     "sigma": {
       "kind": "detection",
       "source": "SigmaHQ",
       "url": "https://github.com/SigmaHQ/sigma",
-      "fetched_at": "2026-11-06T00:41:59.985Z",
+      "fetched_at": "2026-11-06T21:28:29.210Z",
       "status": "ok",
       "count": 3164
     },
@@ -52,7 +52,7 @@
       "kind": "detection",
       "source": "Microsoft Sentinel Hunting Queries",
       "url": "https://github.com/Azure/Azure-Sentinel",
-      "fetched_at": "2026-11-06T00:42:02.281Z",
+      "fetched_at": "2026-11-06T21:28:31.966Z",
       "status": "ok",
       "count": 496
     },
@@ -60,7 +60,7 @@
       "kind": "detection",
       "source": "Splunk Security Content",
       "url": "https://github.com/splunk/security_content",
-      "fetched_at": "2026-11-06T00:42:05.565Z",
+      "fetched_at": "2026-11-06T21:28:35.164Z",
       "status": "ok",
       "count": 500
     },
@@ -68,15 +68,15 @@
       "kind": "vulnerability",
       "source": "CISA Known Exploited Vulnerabilities",
       "url": "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
-      "fetched_at": "2026-11-06T00:41:52.162Z",
+      "fetched_at": "2026-11-06T21:28:20.028Z",
       "status": "ok",
-      "count": 1768
+      "count": 1769
     },
     "epss": {
       "kind": "vulnerability",
       "source": "FIRST EPSS",
       "url": "https://epss.cyentia.com/epss_scores-current.csv.gz",
-      "fetched_at": "2026-11-06T00:41:53.426Z",
+      "fetched_at": "2026-11-06T21:28:21.153Z",
       "status": "ok",
       "count": 5819
     },
@@ -84,7 +84,7 @@
       "kind": "attack",
       "source": "MITRE ATT&CK Enterprise",
       "url": "https://github.com/mitre/cti/tree/master/enterprise-attack",
-      "fetched_at": "2026-11-06T00:41:54.354Z",
+      "fetched_at": "2026-11-06T21:28:23.925Z",
       "status": "ok",
       "count": 706
     }
